@@ -113,13 +113,16 @@ export const verifyApiKey = async (
   provider: ActiveProvider,
   signal?: AbortSignal
 ): Promise<void> => {
+  // 只带该协议需要的鉴权头：多的头会让预检把 x-api-key 也算进去，
+  // 少数网关不认这个头就会整条预检失败，看起来像「网络不通」。
+  const authHeaders: Record<string, string> =
+    provider.protocol === 'anthropic'
+      ? { 'x-api-key': provider.apiKey, Authorization: `Bearer ${provider.apiKey}` }
+      : { Authorization: `Bearer ${provider.apiKey}` }
   try {
     await request(modelsEndpoint(provider), {
       method: 'GET',
-      headers: {
-        Authorization: `Bearer ${provider.apiKey}`,
-        'x-api-key': provider.apiKey,
-      },
+      headers: authHeaders,
       signal,
     })
   } catch (error) {

@@ -68,6 +68,8 @@ const KeyField = ({ provider }: { provider: ActiveProvider }) => {
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // 校验失败的原因类型：401 是无解，网络/跨域则可以「仍然保存」后到对话里验证
+  const [errorKind, setErrorKind] = useState<ReturnType<typeof classifyApiError> | null>(null)
 
   const describe = (cause: unknown): string => {
     const kind = classifyApiError(cause)
@@ -82,6 +84,16 @@ const KeyField = ({ provider }: { provider: ActiveProvider }) => {
     })
   }
 
+  /** 跳过校验直接写入：校验失败可能只是本机网络或跨域被拦，不宜挡住 Key 保存 */
+  const commit = () => {
+    updateProviderConfig(provider.id, { apiKey: value.trim() })
+    setValue('')
+    setEditing(false)
+    setError(null)
+    setErrorKind(null)
+    showToast({ key: 'providerSaved' })
+  }
+
   const save = async () => {
     const apiKey = value.trim()
     if (!apiKey || saving) {
@@ -89,13 +101,12 @@ const KeyField = ({ provider }: { provider: ActiveProvider }) => {
     }
     setSaving(true)
     setError(null)
+    setErrorKind(null)
     try {
       await verifyApiKey({ ...provider, apiKey })
-      updateProviderConfig(provider.id, { apiKey })
-      setValue('')
-      setEditing(false)
-      showToast({ key: 'providerSaved' })
+      commit()
     } catch (cause) {
+      setErrorKind(classifyApiError(cause))
       setError(describe(cause))
     } finally {
       setSaving(false)
@@ -150,7 +161,16 @@ const KeyField = ({ provider }: { provider: ActiveProvider }) => {
           </button>
         </div>
       )}
-      {error ? <div className={styles.error}>{error}</div> : null}
+      {error ? (
+        <div className={styles.error}>
+          <span className={styles.errorText}>{error}</span>
+          {errorKind === 'unauthorized' ? null : (
+            <button type="button" className={styles.errorAction} onClick={commit}>
+              {t('providerSaveAnyway')}
+            </button>
+          )}
+        </div>
+      ) : null}
     </Field>
   )
 }
