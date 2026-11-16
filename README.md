@@ -48,22 +48,24 @@ The bundle has no backend dependency, so GitHub Pages, Cloudflare Pages, and sim
 
 ## Providers
 
-Settings → Providers selects the model provider; each provider keeps its own API Key and the switch applies to the next message.
+Settings → Providers saves an API Key per provider and lets you **connect several providers at once**. Each key can carry **several models**; switch between them from the model menu at the bottom-right of the input box, effective from the next message.
 
-| Provider | Endpoint | Preset model |
-|---|---|---|
-| DeepSeek | `https://api.deepseek.com/anthropic/v1/messages` | `deepseek-flash` |
-| Kimi | `https://api.moonshot.cn/anthropic/v1/messages` | `kimi-k2.5` |
-| GLM | `https://open.bigmodel.cn/api/anthropic/v1/messages` | `glm-4.6` |
-| MiMo | `https://api.xiaomimimo.com/anthropic/v1/messages` | `mimo-v2.5-pro` |
-| Qwen | `https://maas.qianwenaiapi.com/apps/anthropic/v1/messages` | `qwen3-max` |
-| OpenRouter | `https://openrouter.ai/api/v1/chat/completions` | `openrouter/auto` |
+| Provider | Preset endpoint | Protocol | Browser direct |
+|---|---|---|---|
+| DeepSeek | `https://api.deepseek.com/anthropic` | Anthropic-compatible | ✅ |
+| Kimi | `https://api.moonshot.cn/v1` | OpenAI-compatible | ✅ (`/anthropic` fails preflight) |
+| GLM | `https://open.bigmodel.cn/api/paas/v4` | OpenAI-compatible | ❌ neither protocol allows it; use a reverse proxy |
+| MiMo | `https://api.xiaomimimo.com/anthropic` | Anthropic-compatible | ✅ |
+| Qwen | `https://maas.qianwenaiapi.com/compatible-mode/v1` | OpenAI-compatible | ✅ (`/apps/anthropic` returns 401 on preflight) |
+| OpenRouter | `https://openrouter.ai/api/v1` | OpenAI-compatible | ✅ |
 
-- Everything except OpenRouter uses the Anthropic-compatible `/v1/messages`, the same code path as DeepSeek. OpenRouter only offers an OpenAI-compatible API, converted by a small adapter.
-- Endpoint, model, and protocol can all be overridden: leaving the endpoint empty uses the preset, and the protocol can be switched to OpenAI-compatible for self-hosted gateways such as one-api or new-api.
-- Keys, endpoints, and models are stored per provider in localStorage; a single legacy key is migrated to DeepSeek on first launch.
+- Saving: the key row has its own **Save**, and endpoint / protocol / model list are committed with **Save settings** at the bottom. A saved key is masked; click the pencil icon to replace it.
+- Models: type a model ID and press Enter (or Add) to append it as a removable chip. Leave the list empty to use the preset models.
+- Endpoint and protocol are overridable: an empty endpoint uses the preset, and the protocol can be switched for self-hosted gateways such as one-api or new-api.
+- Configuration is stored per provider in localStorage; a single legacy key is migrated to DeepSeek on first launch.
 - Capabilities degrade per provider. Web search, document parsing, speech, server-side titles, and continuation are DeepSeek-only and are hidden elsewhere. Images are inlined as base64 for third-party providers; documents require DeepSeek.
 - While the built-in default prompt is unchanged, third-party providers receive no DeepSeek identity prompt; custom presets are still sent.
+- **CORS**: on a purely static deployment the browser calls each API directly, so an endpoint that does not allow cross-origin requests is blocked and the UI reports it. GLM needs a reverse proxy; keep Kimi and Qwen on their default OpenAI-compatible endpoints.
 
 ## Prompts
 

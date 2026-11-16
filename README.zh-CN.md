@@ -48,22 +48,24 @@ pnpm build
 
 ## 模型服务
 
-「设置 → 模型服务」可以选择服务商并分别保存各自的 API Key，切换后从下一条消息开始生效，历史消息保持不变。
+「设置 → 模型服务」可以为多家服务商分别保存 API Key（**可同时挂载多家**），每家的 Key 下可以挂**多个模型**，在输入框右下角的模型菜单里随时切换，切换后从下一条消息生效。
 
-| 服务商 | 接口 | 预设模型 |
-|---|---|---|
-| DeepSeek | `https://api.deepseek.com/anthropic/v1/messages` | `deepseek-flash` |
-| Kimi | `https://api.moonshot.cn/anthropic/v1/messages` | `kimi-k2.5` |
-| GLM | `https://open.bigmodel.cn/api/anthropic/v1/messages` | `glm-4.6` |
-| MiMo | `https://api.xiaomimimo.com/anthropic/v1/messages` | `mimo-v2.5-pro` |
-| 通义千问 | `https://maas.qianwenaiapi.com/apps/anthropic/v1/messages` | `qwen3-max` |
-| OpenRouter | `https://openrouter.ai/api/v1/chat/completions` | `openrouter/auto` |
+| 服务商 | 预设接口 | 协议 | 浏览器直连 |
+|---|---|---|---|
+| DeepSeek | `https://api.deepseek.com/anthropic` | Anthropic 兼容 | ✅ |
+| Kimi | `https://api.moonshot.cn/v1` | OpenAI 兼容 | ✅（`/anthropic` 预检不放行） |
+| GLM | `https://open.bigmodel.cn/api/paas/v4` | OpenAI 兼容 | ❌ 两种协议都不放行，需自建反代 |
+| MiMo | `https://api.xiaomimimo.com/anthropic` | Anthropic 兼容 | ✅ |
+| 通义千问 | `https://maas.qianwenaiapi.com/compatible-mode/v1` | OpenAI 兼容 | ✅（`/apps/anthropic` 预检 401） |
+| OpenRouter | `https://openrouter.ai/api/v1` | OpenAI 兼容 | ✅ |
 
-- 除 OpenRouter 外都走 Anthropic 兼容的 `/v1/messages`，与 DeepSeek 同一条代码路径；OpenRouter 只提供 OpenAI 兼容接口，请求体由内置适配器转换。
-- 接口地址、模型与协议都可在界面里覆盖：地址留空用预设，协议可选 Anthropic 兼容或 OpenAI 兼容，便于接入 one-api、new-api 之类的自建网关。
-- Key、地址与模型按服务商分别保存在本机 localStorage；旧的单 Key 记录会在首次启动时自动迁移到 DeepSeek。
+- 保存方式：Key 处有「保存」，地址／协议／模型列表改完点底部「保存配置」，两者分别生效；Key 保存后只显示掩码，点铅笔图标可重新输入。
+- 模型列表：输入模型 ID 后回车或点「添加」，逐个以标签展示，可单独移除；留空则使用预设列表。一个 Key 下挂几个模型就都能在模型菜单里选到。
+- 接口地址、协议可覆盖：地址留空用预设，协议可选 Anthropic 兼容或 OpenAI 兼容，便于接入 one-api、new-api 之类的自建网关。
+- 配置按服务商分别保存在本机 localStorage；旧的单 Key 记录会在首次启动时自动迁移到 DeepSeek。
 - 能力随服务商降级：联网搜索、文档解析、语音朗读与听写、服务端生成标题、续写仅 DeepSeek 提供；其他服务商的界面上不显示这些入口。图片附件在第三方服务商下按 base64 内联发送，文档附件请切换到 DeepSeek。
 - 未改动内置默认提示词时，其他服务商不会收到声明 DeepSeek 身份的系统提示词；自定义预设仍会照常发送。
+- **跨域限制**：纯静态部署时请求由浏览器直连各家接口，对方未开放 CORS 就会被浏览器拦截（界面上会提示「无法连接…」）。GLM 需要把接口地址改成自建反代；Kimi 与千问请保持默认的 OpenAI 兼容通道。
 
 ## 提示词
 

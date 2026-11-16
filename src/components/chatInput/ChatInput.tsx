@@ -29,6 +29,7 @@ import { showToast } from '../base/toastState.js'
 import { ACCEPT, isImage, resolveMimeType, useUploads } from '../../services/attachments.js'
 import { activeApiKey, useActiveProvider } from '../../services/providers.js'
 import { DraftAttachments } from './DraftAttachments.js'
+import { ModelSwitcher } from './ModelSwitcher.js'
 import { useVoiceInput } from './useVoiceInput.js'
 import { VoiceButton } from './VoiceButton.js'
 import { Spectrum } from './Spectrum.js'
@@ -252,6 +253,7 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
           ) : null}
         </div>
         <div className={styles.right}>
+          <ModelSwitcher />
           {provider.capabilities.speech ? (
             <VoiceButton
               status={voice.status}

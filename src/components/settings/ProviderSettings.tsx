@@ -1,16 +1,16 @@
 import { useState, type ReactNode } from 'react'
-import { useTranslate, type TranslationKey } from '../../i18n/index.js'
+import { useTranslate } from '../../i18n/index.js'
 import { verifyApiKey } from '../../services/api/client.js'
 import { classifyApiError } from '../../services/api/errors.js'
 import {
   activeProvider,
+  isMounted,
   PROVIDERS,
   resetProviderConfig,
-  setActiveProvider,
+  resolveProvider,
   updateProviderConfig,
   useProviders,
   type ActiveProvider,
-  type ProviderCapabilities,
   type ProviderId,
   type ProviderProtocol,
 } from '../../services/providers.js'
@@ -44,21 +44,21 @@ const Field = ({
 )
 
 /** 当前服务商实际可用的能力，用于说明为什么某些按钮消失了 */
-const capabilityList = (capabilities: ProviderCapabilities, t: (key: TranslationKey) => string) => {
-  const keys: TranslationKey[] = ['providerCapabilityChat']
-  if (capabilities.images) {
-    keys.push('providerCapabilityImages')
+const capabilityList = (provider: ActiveProvider, t: ReturnType<typeof useTranslate>) => {
+  const list: string[] = [t('providerCapabilityChat')]
+  if (provider.capabilities.images) {
+    list.push(t('providerCapabilityImages'))
   }
-  if (capabilities.search) {
-    keys.push('providerCapabilitySearch')
+  if (provider.capabilities.search) {
+    list.push(t('providerCapabilitySearch'))
   }
-  if (capabilities.files) {
-    keys.push('providerCapabilityFiles')
+  if (provider.capabilities.files) {
+    list.push(t('providerCapabilityFiles'))
   }
-  if (capabilities.speech) {
-    keys.push('providerCapabilitySpeech')
+  if (provider.capabilities.speech) {
+    list.push(t('providerCapabilitySpeech'))
   }
-  return keys.map((key) => t(key)).join(' · ')
+  return list.join(' · ')
 }
 
 /** API Key：保存后只显示掩码，点编辑按钮才能重新输入 */
@@ -75,9 +75,11 @@ const KeyField = ({ provider }: { provider: ActiveProvider }) => {
       return t('apiKeyInvalid')
     }
     if (kind === 'network') {
-      return t('commonNetworkErrorToast')
+      return t('providerNetworkHint', { name: provider.preset.label })
     }
-    return t('apiKeyVerificationFailed', { message: cause instanceof Error ? cause.message : String(cause) })
+    return t('apiKeyVerificationFailed', {
+      message: cause instanceof Error ? cause.message : String(cause),
+    })
   }
 
   const save = async () => {
@@ -92,6 +94,7 @@ const KeyField = ({ provider }: { provider: ActiveProvider }) => {
       updateProviderConfig(provider.id, { apiKey })
       setValue('')
       setEditing(false)
+      showToast({ key: 'providerSaved' })
     } catch (cause) {
       setError(describe(cause))
     } finally {
@@ -112,7 +115,7 @@ const KeyField = ({ provider }: { provider: ActiveProvider }) => {
       {saved && !editing ? (
         <div className={styles.saved}>
           <span className={styles.mask}>{'*'.repeat(Math.min(provider.apiKey.length, 48))}</span>
-          <span className={styles.savedHint}>{t('providerApiKeySaved')}</span>
+          <span className={styles.savedHint}>{t('providerMounted')}</span>
           <IconButton
             tone="primary"
             icon={<IconEditOutline16 />}
@@ -143,7 +146,7 @@ const KeyField = ({ provider }: { provider: ActiveProvider }) => {
             disabled={!value.trim() || saving}
             onClick={() => void save()}
           >
-            {saving ? t('apiKeyVerifying') : t('confirm')}
+            {saving ? t('apiKeyVerifying') : t('providerSaveKey')}
           </button>
         </div>
       )}
@@ -152,35 +155,45 @@ const KeyField = ({ provider }: { provider: ActiveProvider }) => {
   )
 }
 
-/** 模型服务：选择服务商，配置该服务商的 Key、地址、模型与协议 */
-export const ProviderSettings = () => {
+/**
+ * 地址、协议与模型列表：先在本地编辑，点「保存配置」一次性写入，
+ * 避免边输入边覆盖正在使用的模型。
+ */
+const ConnectionEditor = ({ provider }: { provider: ActiveProvider }) => {
   const t = useTranslate()
-  // 订阅整份配置，服务商、Key、地址、模型任一变化都重新渲染
-  useProviders()
-  const provider = activeProvider()
-  const [resetted, setResetted] = useState(false)
+  const [baseUrl, setBaseUrl] = useState(provider.config.baseUrl)
+  const [protocol, setProtocol] = useState<ProviderProtocol>(provider.protocol)
+  const [models, setModels] = useState<string[]>(provider.models)
+  const [newModel, setNewModel] = useState('')
+
+  const blocked = provider.preset.corsBlocked?.includes(protocol) ?? false
+
+  const addModel = () => {
+    const value = newModel.trim()
+    if (!value || models.includes(value)) {
+      return
+    }
+    setModels([...models, value])
+    setNewModel('')
+  }
+
+  const save = () => {
+    const list = models.map((model) => model.trim()).filter(Boolean)
+    const sameAsPreset =
+      list.length === provider.preset.models.length &&
+      list.every((model, index) => model === provider.preset.models[index])
+    const ok = updateProviderConfig(provider.id, {
+      baseUrl: baseUrl.trim(),
+      // 与预设完全一致时存空列表，之后跟随预设更新
+      models: sameAsPreset ? [] : list,
+      protocol: protocol === provider.preset.protocol ? '' : protocol,
+    })
+    showToast(ok ? { key: 'providerSaved' } : { key: 'promptSaveFailed', type: 'error' })
+  }
 
   return (
-    <div className={styles.wrap}>
-      <Field label={t('providerService')} hint={t('providerServiceHint')}>
-        <Select
-          ariaLabel={t('providerService')}
-          className={styles.select}
-          value={provider.id}
-          options={PROVIDERS.map((item) => ({ value: item.id, label: item.label }))}
-          onChange={(value) => {
-            setActiveProvider(value as ProviderId)
-            setResetted(false)
-          }}
-        />
-      </Field>
-
-      <KeyField key={provider.id} provider={provider} />
-
-      <Field
-        label={t('providerBaseUrl')}
-        hint={t('providerBaseUrlHint', { url: provider.preset.baseUrl })}
-      >
+    <>
+      <Field label={t('providerBaseUrl')} hint={t('providerBaseUrlHint')}>
         <div className={styles.inputRow}>
           <input
             type="text"
@@ -188,35 +201,9 @@ export const ProviderSettings = () => {
             spellCheck={false}
             autoComplete="off"
             placeholder={provider.preset.baseUrl}
-            value={provider.config.baseUrl}
-            onChange={(event) => {
-              updateProviderConfig(provider.id, { baseUrl: event.target.value })
-              setResetted(false)
-            }}
+            value={baseUrl}
+            onChange={(event) => setBaseUrl(event.target.value)}
           />
-        </div>
-      </Field>
-
-      <Field label={t('providerModel')} hint={t('providerModelHint', { model: provider.preset.model })}>
-        <div className={styles.inputRow}>
-          <input
-            type="text"
-            className={styles.input}
-            list={`provider-models-${provider.id}`}
-            spellCheck={false}
-            autoComplete="off"
-            placeholder={provider.preset.model}
-            value={provider.config.model}
-            onChange={(event) => {
-              updateProviderConfig(provider.id, { model: event.target.value })
-              setResetted(false)
-            }}
-          />
-          <datalist id={`provider-models-${provider.id}`}>
-            {provider.preset.models.map((model) => (
-              <option key={model} value={model} />
-            ))}
-          </datalist>
         </div>
       </Field>
 
@@ -224,38 +211,113 @@ export const ProviderSettings = () => {
         <Select
           ariaLabel={t('providerProtocol')}
           className={styles.select}
-          value={provider.config.protocol || provider.protocol}
+          value={protocol}
           options={[
             { value: 'anthropic', label: t('providerProtocolAnthropic') },
             { value: 'openai', label: t('providerProtocolOpenai') },
           ]}
-          onChange={(value) =>
-            updateProviderConfig(provider.id, {
-              // 选回预设协议时存空串，后续跟随预设变化
-              protocol: value === provider.preset.protocol ? '' : (value as ProviderProtocol),
-            })
-          }
+          onChange={(value) => setProtocol(value as ProviderProtocol)}
         />
+      </Field>
+
+      {blocked ? <div className={styles.warning}>{t('providerCorsWarning')}</div> : null}
+
+      <Field label={t('providerModels')} hint={t('providerModelsHint')}>
+        <div className={styles.modelChips}>
+          {models.map((model) => (
+            <span key={model} className={styles.modelChip}>
+              {model}
+              <button
+                type="button"
+                aria-label={`${t('providerModelRemove')} ${model}`}
+                onClick={() => setModels(models.filter((item) => item !== model))}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+        <div className={styles.inputRow}>
+          <input
+            type="text"
+            className={styles.input}
+            spellCheck={false}
+            autoComplete="off"
+            placeholder={t('providerModelAddPlaceholder')}
+            value={newModel}
+            onChange={(event) => setNewModel(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+                event.preventDefault()
+                addModel()
+              }
+            }}
+          />
+          <span className={styles.divider} />
+          <button
+            type="button"
+            className={styles.confirm}
+            disabled={!newModel.trim()}
+            onClick={addModel}
+          >
+            {t('providerModelAdd')}
+          </button>
+        </div>
       </Field>
 
       <div className={styles.footer}>
         <div className={styles.caps}>
-          {resetted
-            ? t('providerResetDone')
-            : t('providerCapabilities', { list: capabilityList(provider.capabilities, t) })}
+          {t('providerCapabilities', { list: capabilityList(provider, t) })}
         </div>
-        <Button
-          variant="outlined"
-          size="m"
-          onClick={() => {
-            resetProviderConfig(provider.id)
-            setResetted(true)
-            showToast({ key: 'providerResetDone' })
-          }}
-        >
-          {t('providerReset')}
-        </Button>
+        <div className={styles.footerActions}>
+          <Button
+            variant="outlined"
+            size="m"
+            onClick={() => {
+              resetProviderConfig(provider.id)
+              setBaseUrl('')
+              setProtocol(provider.preset.protocol)
+              setModels(provider.preset.models)
+              showToast({ key: 'providerResetDone' })
+            }}
+          >
+            {t('providerReset')}
+          </Button>
+          <Button variant="primary" size="m" onClick={save}>
+            {t('providerSave')}
+          </Button>
+        </div>
       </div>
+    </>
+  )
+}
+
+/** 模型服务：为每个服务商分别保存 Key、地址、协议与模型列表，可多家同时挂载 */
+export const ProviderSettings = () => {
+  const t = useTranslate()
+  useProviders()
+  const current = activeProvider()
+  const [editingId, setEditingId] = useState<ProviderId>(current.id)
+  const provider = resolveProvider(editingId)
+
+  return (
+    <div className={styles.wrap}>
+      <Field label={t('providerService')} hint={t('providerServiceHint')}>
+        <Select
+          ariaLabel={t('providerService')}
+          className={styles.select}
+          value={editingId}
+          options={PROVIDERS.map((item) => ({
+            value: item.id,
+            label: `${item.label} · ${t(isMounted(item.id) ? 'providerMounted' : 'providerNotMounted')}`,
+          }))}
+          onChange={(value) => setEditingId(value as ProviderId)}
+        />
+      </Field>
+
+      <div className={styles.switchHint}>{t('providerSwitchHint')}</div>
+      <KeyField key={`key-${editingId}`} provider={provider} />
+      <ConnectionEditor key={`conn-${editingId}`} provider={provider} />
     </div>
   )
 }

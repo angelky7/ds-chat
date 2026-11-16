@@ -5,6 +5,7 @@ import { streamChatCompletion, toChatCompletion } from '../api/openai.js'
 import type { ChatModel, CreateMessageRequest } from '../api/types.js'
 import { extractFileIds, getFileErrorCode, isRetryableApiError } from '../api/errors.js'
 import { cancelUpload, describeUploadError, uploadAttachment, useUploads } from '../attachments.js'
+import { translate } from '../../i18n/index.js'
 import { useSettings } from '../settings.js'
 import {
   DEEPSEEK_DEFAULT_PROMPT,
@@ -47,9 +48,9 @@ const MODEL: ChatModel = 'deepseek-flash'
 /** 第三方 Anthropic 兼容网关要求显式给出输出上限 */
 const MAX_OUTPUT_TOKENS = 8192
 
-/** 会话里记录的是生成时的模型；切换到其他服务商时改用其预设模型 */
-const resolveModel = (initial: ChatModel | null | undefined, provider: ActiveProvider): string =>
-  provider.id === 'deepseek' ? (initial ?? provider.model) : provider.model
+/** 发送时以输入框右下角选中的模型为准；会话里记录的 model 只用于展示 */
+const resolveModel = (_initial: ChatModel | null | undefined, provider: ActiveProvider): string =>
+  provider.model
 
 /**
  * 开场消息转成真实消息：用户消息直接展示，助手消息视为已完成的回答，
@@ -303,7 +304,7 @@ const createReply = (): AssistantMessage => {
     id: createId(),
     role: 'assistant',
     createdAt: Date.now(),
-    model: MODEL,
+    model: activeProvider().model,
     thinking,
     search,
     prefix: true,
@@ -1208,9 +1209,13 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
           // 已收到 message_delta 的结束原因，只是缺了结尾的 message_stop
           reply = settleReply(reply, 'done', Date.now())
         } else if (error instanceof ApiError) {
+          const networkHint =
+            error.kind === 'network'
+              ? ` ${translate('providerNetworkHint', { name: provider.preset.label })}`
+              : ''
           reply = settleReply(reply, 'error', Date.now(), {
             kind: error.kind,
-            message: error.message,
+            message: `${error.message}${networkHint}`,
             status: error.status,
             localMessage: error.localMessage,
           })
