@@ -7,7 +7,14 @@ import { API_ORIGIN } from './api/origin.js'
  */
 export type ProviderProtocol = 'anthropic' | 'openai'
 
-export type ProviderId = 'deepseek' | 'kimi' | 'glm' | 'mimo' | 'qwen' | 'openrouter'
+export type ProviderId =
+  | 'deepseek'
+  | 'kimi'
+  | 'glm'
+  | 'mimo'
+  | 'qwen'
+  | 'volcengine'
+  | 'openrouter'
 
 /** 该服务商能做的事；不支持的功能在界面上隐藏，或在发送前拦下 */
 export type ProviderCapabilities = {
@@ -131,6 +138,22 @@ export const PROVIDERS: ProviderPreset[] = [
     corsBlocked: ['anthropic'],
   },
   {
+    id: 'volcengine',
+    label: '火山引擎',
+    // 方舟的 OpenAI 兼容入口；/api/v3/models 未开放，Key 校验按「无法校验」放行
+    protocol: 'openai',
+    baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+    model: 'doubao-seed-2-1-pro-260915',
+    models: [
+      'doubao-seed-2-1-pro-260915',
+      'doubao-seed-2-1-turbo-260915',
+      'doubao-seed-1-6-250615',
+      'doubao-pro-32k',
+    ],
+    capabilities: { ...chatOnlyCapabilities, thinking: false },
+    keysUrl: 'https://ark.volcengine.com/region:cn-beijing/apikey',
+  },
+  {
     id: 'openrouter',
     label: 'OpenRouter',
     // 只提供 OpenAI 兼容入口，预检允许跨域
@@ -175,6 +198,7 @@ const emptyItems = (): Record<ProviderId, ProviderConfig> => ({
   glm: emptyConfig(),
   mimo: emptyConfig(),
   qwen: emptyConfig(),
+  volcengine: emptyConfig(),
   openrouter: emptyConfig(),
 })
 

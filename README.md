@@ -57,6 +57,8 @@ Settings → Providers saves an API Key per provider and lets you **connect seve
 | GLM | `https://open.bigmodel.cn/api/paas/v4` | OpenAI-compatible | ❌ neither protocol allows it; use a reverse proxy |
 | MiMo | `https://api.xiaomimimo.com/anthropic` | Anthropic-compatible | ✅ |
 | Qwen | `https://maas.qianwenaiapi.com/compatible-mode/v1` | OpenAI-compatible | ✅ (`/apps/anthropic` returns 401 on preflight) |
+| Volcengine (Ark) | `https://ark.cn-beijing.volces.com/api/v3` | OpenAI-compatible | ✅ |
+| Volcengine (Ark) | `https://ark.cn-beijing.volces.com/api/v3` | OpenAI-compatible | ✅ |
 | OpenRouter | `https://openrouter.ai/api/v1` | OpenAI-compatible | ✅ |
 
 - Saving: the key row has its own **Save**, and endpoint / protocol / model list are committed with **Save settings** at the bottom. A saved key is masked; click the pencil icon to replace it.
@@ -65,6 +67,8 @@ Settings → Providers saves an API Key per provider and lets you **connect seve
 - Configuration is stored per provider in localStorage; a single legacy key is migrated to DeepSeek on first launch.
 - Capabilities degrade per provider. Web search, document parsing, speech, server-side titles, and continuation are DeepSeek-only and are hidden elsewhere. Images are inlined as base64 for third-party providers; documents require DeepSeek.
 - While the built-in default prompt is unchanged, third-party providers receive no DeepSeek identity prompt; custom presets are still sent.
+- Volcengine uses Ark's OpenAI-compatible `/api/v3/chat/completions` with `doubao-seed-2-1-pro-260915` as the default model. Ark also exposes `/api/v3/responses` (the Responses API with a different request and event shape), which this app does not use. Ark does not expose `/api/v3/models`, so a key cannot be verified when saved; a bad key surfaces on the first message. Get a key at <https://ark.volcengine.com/region:cn-beijing/apikey>.
+- Volcengine uses Ark's OpenAI-compatible `/api/v3/chat/completions` with `doubao-seed-2-1-pro-260915` as the default model. Ark also exposes `/api/v3/responses` (the Responses API with a different request and event shape), which this app does not use. Ark does not expose `/api/v3/models`, so a key cannot be verified when saved; a bad key surfaces on the first message. Get a key at <https://ark.volcengine.com/region:cn-beijing/apikey>.
 - **CORS**: on a purely static deployment the browser calls each API directly, so an endpoint that does not allow cross-origin requests is blocked and the UI reports it. GLM needs a reverse proxy; keep Kimi and Qwen on their default OpenAI-compatible endpoints.
 
 ## Prompts

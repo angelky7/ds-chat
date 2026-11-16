@@ -213,7 +213,7 @@ export const zh = {
   providerModels: '模型列表',
   providerModelsHint: '一个 Key 可以挂多个模型；在下方输入模型 ID 后回车添加，保存后生效',
   providerModelAdd: '添加',
-  providerModelAddPlaceholder: '输入模型 ID，例如 kimi-latest',
+  providerModelAddPlaceholder: '输入模型 ID 后回车添加',
   providerModelRemove: '移除模型',
   providerSwitchHint: '可同时挂载多家服务商；在输入框右下角的模型菜单里随时切换',
   providerCorsWarning: '该协议的接口实测未开放浏览器跨域直连，直接对话会被浏览器拦截。建议换用另一种协议，或把「接口地址」指向自建反向代理。',

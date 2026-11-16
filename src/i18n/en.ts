@@ -227,7 +227,7 @@ export const en = {
   providerModels: 'Models',
   providerModelsHint: 'One key can serve several models. Type a model ID and press Enter to add it, then save.',
   providerModelAdd: 'Add',
-  providerModelAddPlaceholder: 'Model ID, e.g. kimi-latest',
+  providerModelAddPlaceholder: 'Model ID, press Enter to add',
   providerModelRemove: 'Remove model',
   providerSwitchHint: 'You can connect several providers at once and switch models from the picker at the bottom-right of the input box.',
   providerCorsWarning: 'This endpoint does not allow browser cross-origin requests. Switch protocol, or point the endpoint at your own reverse proxy.',
