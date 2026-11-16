@@ -22,12 +22,31 @@
   flex-shrink: 0;
 }
 
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.logo {
+  display: block;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+
+/* 深色主题下把蓝色标志略微提亮，避免贴深底显得发闷 */
+:global(body.dark) .logo {
+  filter: brightness(1.18);
+}
+
 .appName {
   min-width: 0;
-  padding-left: 4px;
   overflow: hidden;
-  font-size: 20px;
-  line-height: 22px;
+  font-size: 19px;
+  line-height: 24px;
   font-weight: 600;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -177,6 +196,30 @@
   align-items: center;
   gap: 16px;
   margin: 12px 0 0 16px;
+}
+
+.collapsedLogo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  background: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+
+  &:hover {
+    background-color: var(--dsw-alias-bg-layer-3);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--dsw-alias-brand-primary);
+    outline-offset: 2px;
+  }
 }
 
 .collapsedGroup {

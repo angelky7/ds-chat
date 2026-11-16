@@ -71,6 +71,8 @@ export const createConfig = ({
         type: 'javascript/auto',
       },
       { test: /\.(woff2?|ttf)$/, type: 'asset/resource' },
+      // 图片走资源模块，导入即得带 hash 的 URL
+      { test: /\.(png|jpe?g|svg|webp)$/, type: 'asset/resource' },
     ],
   },
   plugins: [
@@ -82,7 +84,15 @@ export const createConfig = ({
     }),
     new rspack.DefinePlugin({ __API_ORIGIN__: JSON.stringify(apiOrigin) }),
     new rspack.CopyRspackPlugin({
-      patterns: [{ from: path.resolve(root, 'LICENSE'), to: 'LICENSE', toType: 'file' }],
+      patterns: [
+        { from: path.resolve(root, 'LICENSE'), to: 'LICENSE', toType: 'file' },
+        // 站点图标固定放在根目录，index.html 用相对路径引用，子路径部署与 file:// 都能用
+        {
+          from: path.resolve(root, 'src/assets/deepseek-logo.png'),
+          to: 'favicon.png',
+          toType: 'file',
+        },
+      ],
     }),
   ],
   performance: { hints: false },
