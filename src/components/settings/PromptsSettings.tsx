@@ -2,15 +2,18 @@ import clsx from 'clsx'
 import { useId, useRef, useState } from 'react'
 import { useTranslate, type TranslationKey } from '../../i18n/index.js'
 import {
+  addOpeningMessage,
   canRestorePrompt,
   createPrompt,
   DEEPSEEK_DEFAULT_PROMPT,
   duplicatePrompt,
   presetDisplayName,
   PROMPT_VARIABLES,
+  removeOpeningMessage,
   removePrompt,
   resetPrompt,
   setActivePrompt,
+  updateOpeningMessage,
   updatePrompt,
   usePrompts,
   type PromptVariable,
@@ -154,6 +157,71 @@ export const PromptsSettings = () => {
             </button>
           ))}
         </div>
+      </div>
+      <div className={styles.block}>
+        <div className={styles.fieldRow}>
+          <div className={styles.fieldLabel}>{t('promptOpening')}</div>
+          <button
+            type="button"
+            className={styles.link}
+            onClick={() => apply(addOpeningMessage(active.id))}
+          >
+            {t('promptOpeningAdd')}
+          </button>
+        </div>
+        {active.opening.length === 0 ? (
+          <div className={styles.openingEmpty}>{t('promptOpeningEmpty')}</div>
+        ) : (
+          <div className={styles.openingList}>
+            {active.opening.map((message) => (
+              <div key={message.id} className={styles.openingItem}>
+                <div className={styles.openingHead}>
+                  <div className={styles.roles} role="group" aria-label={t('promptOpeningRole')}>
+                    {(['user', 'assistant'] as const).map((role) => (
+                      <button
+                        key={role}
+                        type="button"
+                        className={clsx(
+                          styles.roleButton,
+                          message.role === role && styles.roleActive
+                        )}
+                        aria-pressed={message.role === role}
+                        onClick={() => apply(updateOpeningMessage(active.id, message.id, { role }))}
+                      >
+                        {t(role === 'user' ? 'promptOpeningUser' : 'promptOpeningAssistant')}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    className={styles.link}
+                    onClick={() => apply(removeOpeningMessage(active.id, message.id))}
+                  >
+                    {t('promptOpeningRemove')}
+                  </button>
+                </div>
+                <textarea
+                  className={styles.openingTextarea}
+                  rows={2}
+                  spellCheck={false}
+                  aria-label={t('promptOpening')}
+                  placeholder={t(
+                    message.role === 'user'
+                      ? 'promptOpeningUserPlaceholder'
+                      : 'promptOpeningAssistantPlaceholder'
+                  )}
+                  value={message.content}
+                  onChange={(event) =>
+                    apply(
+                      updateOpeningMessage(active.id, message.id, { content: event.target.value })
+                    )
+                  }
+                />
+              </div>
+            ))}
+          </div>
+        )}
+        <div className={styles.description}>{t('promptOpeningDescription')}</div>
       </div>
       <div className={styles.footer}>
         <div className={styles.hint}>

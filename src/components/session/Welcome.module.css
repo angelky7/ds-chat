@@ -16,6 +16,46 @@
   padding: 0 32px 64px;
 }
 
+.opening {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--dsw-alias-border-l2-darkmode-thin);
+  border-radius: 16px;
+  text-align: left;
+}
+
+.openingHint {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.openingRow {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.openingRole {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.openingText {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dsw-alias-label-secondary);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .greeting {
   display: flex;
   align-items: center;
@@ -29,7 +69,47 @@
 }
 
 @media (max-width: 439px) {
-  .greeting {
+  .opening {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--dsw-alias-border-l2-darkmode-thin);
+  border-radius: 16px;
+  text-align: left;
+}
+
+.openingHint {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.openingRow {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.openingRole {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.openingText {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dsw-alias-label-secondary);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.greeting {
     font-size: 20px;
     line-height: 28px;
     font-weight: 500;
@@ -50,7 +130,47 @@
     padding: 0 16px env(safe-area-inset-bottom);
   }
 
-  .greeting {
+  .opening {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--dsw-alias-border-l2-darkmode-thin);
+  border-radius: 16px;
+  text-align: left;
+}
+
+.openingHint {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.openingRow {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.openingRole {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.openingText {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dsw-alias-label-secondary);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.greeting {
     flex-shrink: 0;
     margin: auto 0;
   }

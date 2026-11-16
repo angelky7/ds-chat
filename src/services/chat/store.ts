@@ -6,7 +6,12 @@ import type { ChatModel, CreateMessageRequest } from '../api/types.js'
 import { extractFileIds, getFileErrorCode, isRetryableApiError } from '../api/errors.js'
 import { cancelUpload, describeUploadError, uploadAttachment, useUploads } from '../attachments.js'
 import { useSettings } from '../settings.js'
-import { DEEPSEEK_DEFAULT_PROMPT, resolveActiveSystemPrompt } from '../prompts.js'
+import {
+  DEEPSEEK_DEFAULT_PROMPT,
+  resolveActiveOpening,
+  resolveActiveSystemPrompt,
+  type OpeningMessage,
+} from '../prompts.js'
 import { activeApiKey, activeProvider, type ActiveProvider } from '../providers.js'
 import { appendBranch, getVisibleMessages, normalizeSession, selectVersion } from './branches.js'
 import * as db from './db.js'
@@ -45,6 +50,31 @@ const MAX_OUTPUT_TOKENS = 8192
 /** 会话里记录的是生成时的模型；切换到其他服务商时改用其预设模型 */
 const resolveModel = (initial: ChatModel | null | undefined, provider: ActiveProvider): string =>
   provider.id === 'deepseek' ? (initial ?? provider.model) : provider.model
+
+/**
+ * 开场消息转成真实消息：用户消息直接展示，助手消息视为已完成的回答，
+ * 因此会进入后续请求的上下文，相当于给模型一段示例对话。
+ */
+const openingMessages = (opening: OpeningMessage[]): Message[] => {
+  const now = Date.now()
+  return opening.map((item, index) => {
+    const createdAt = now - (opening.length - index) * 1000
+    return item.role === 'user'
+      ? { id: createId(), role: 'user', content: item.content, files: [], createdAt }
+      : {
+          id: createId(),
+          role: 'assistant',
+          createdAt,
+          model: activeProvider().model,
+          thinking: false,
+          search: false,
+          prefix: false,
+          status: 'done',
+          stopReason: 'end_turn',
+          blocks: [{ type: 'text', text: item.content, citations: [] }],
+        }
+  })
+}
 
 /** 没有服务端标题时用首句兜底，最多 30 个字符 */
 const localTitle = ({ content }: UserMessage): string =>
@@ -580,14 +610,20 @@ export const sendMessage = (targetSessionId: string | null) => {
     return false
   }
   if (sessionId === null) {
-    const session: Session = {
-      id: createId(),
-      title: '',
-      createdAt: now,
-      updatedAt: now,
-      messages: [],
-      rootMessageId: null,
-    }
+    // 新对话先铺开放场消息，首次提问接在它们之后
+    const seed = openingMessages(resolveActiveOpening(activeProvider().model))
+    const session: Session = appendBranch(
+      {
+        id: createId(),
+        title: '',
+        createdAt: now,
+        updatedAt: now,
+        messages: [],
+        rootMessageId: null,
+      },
+      null,
+      seed
+    )
     sessionId = session.id
     touchSession(session.id)
     set((state) => ({

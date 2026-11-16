@@ -11,12 +11,22 @@ export const DEEPSEEK_DEFAULT_PROMPT = '该助手为DeepSeek，由深度求索�
 /** 内置预设的 id；不可删除，名称随界面语言显示 */
 export const DEFAULT_PRESET_ID = 'deepseek-default'
 
+/** 开场消息：新对话建立时带上的示例对话，按顺序进入消息列表与请求上下文 */
+export type OpeningMessage = {
+  id: string
+  role: 'user' | 'assistant'
+  /** 支持 {{变量}} */
+  content: string
+}
+
 export type PromptPreset = {
   id: string
   /** 用户可见名称，允许重名 */
   name: string
   /** 系统提示词，支持 {{变量}} */
   system: string
+  /** 开场 user / assistant 对话，可为空 */
+  opening: OpeningMessage[]
   /** 内置预设不可删除、不可改名 */
   builtin: boolean
 }
@@ -32,11 +42,33 @@ const builtinPreset = (): PromptPreset => ({
   id: DEFAULT_PRESET_ID,
   name: 'DeepSeek 默认',
   system: DEEPSEEK_DEFAULT_PROMPT,
+  opening: [],
   builtin: true,
 })
 
 const toText = (value: unknown, fallback = ''): string =>
   typeof value === 'string' ? value : fallback
+
+/** 开场消息逐项校验：角色只接受 user / assistant，内容为空的行丢弃 */
+const parseOpening = (value: unknown): OpeningMessage[] => {
+  if (!Array.isArray(value)) {
+    return []
+  }
+  const messages: OpeningMessage[] = []
+  for (const item of value) {
+    const message = (item ?? {}) as Partial<Record<keyof OpeningMessage, unknown>>
+    const role = message.role === 'user' ? 'user' : message.role === 'assistant' ? 'assistant' : null
+    const content = toText(message.content)
+    if (!role || !content.trim()) {
+      continue
+    }
+    messages.push({ id: toText(message.id) || createId(), role, content })
+    if (messages.length >= 20) {
+      break
+    }
+  }
+  return messages
+}
 
 /** 保存的数据可能来自旧版本或被手动改动，逐项校验；内置预设始终存在 */
 const parsePrompts = (value: unknown): PromptsState => {
@@ -49,7 +81,13 @@ const parsePrompts = (value: unknown): PromptsState => {
       if (!id || id === DEFAULT_PRESET_ID || presets.some((entry) => entry.id === id)) {
         continue
       }
-      presets.push({ id, name: toText(preset.name).slice(0, 40), system: toText(preset.system), builtin: false })
+      presets.push({
+        id,
+        name: toText(preset.name).slice(0, 40),
+        system: toText(preset.system),
+        opening: parseOpening(preset.opening),
+        builtin: false,
+      })
     }
   }
   const all = [builtinPreset(), ...presets]
@@ -95,7 +133,7 @@ export const findPrompt = (id: string): PromptPreset | undefined =>
 
 export const updatePrompt = (
   id: string,
-  patch: Partial<Pick<PromptPreset, 'name' | 'system'>>
+  patch: Partial<Pick<PromptPreset, 'name' | 'system' | 'opening'>>
 ): boolean => {
   const state = usePrompts.getState()
   const target = state.presets.find((preset) => preset.id === id)
@@ -111,9 +149,9 @@ export const updatePrompt = (
 }
 
 /** 新增一套提示词并切换过去，返回新预设的 id */
-export const createPrompt = (name: string, system = ''): string => {
+export const createPrompt = (name: string, system = '', opening: OpeningMessage[] = []): string => {
   const state = usePrompts.getState()
-  const preset: PromptPreset = { id: createId(), name, system, builtin: false }
+  const preset: PromptPreset = { id: createId(), name, system, opening, builtin: false }
   commit({ presets: [...state.presets, preset], activeId: preset.id })
   return preset.id
 }
@@ -124,7 +162,7 @@ export const duplicatePrompt = (id: string, name: string): string | null => {
   if (!source) {
     return null
   }
-  return createPrompt(name, source.system)
+  return createPrompt(name, source.system, source.opening.map((message) => ({ ...message, id: createId() })))
 }
 
 /** 内置预设不可删除；删除正在使用的预设时切回默认 */
@@ -152,6 +190,43 @@ export const resetPrompt = (id: string): boolean => {
     presets: state.presets.map((preset) =>
       preset.id === id ? { ...preset, system: DEEPSEEK_DEFAULT_PROMPT } : preset
     ),
+  })
+}
+
+/** 新增一条开场消息：默认接着上一条的角色交替，列表为空时从 user 开始 */
+export const addOpeningMessage = (id: string): boolean => {
+  const preset = findPrompt(id)
+  if (!preset || preset.opening.length >= 20) {
+    return false
+  }
+  const role = preset.opening.at(-1)?.role === 'assistant' ? 'user' : 'assistant'
+  const message: OpeningMessage = { id: createId(), role, content: '' }
+  return updatePrompt(id, { opening: [...preset.opening, message] })
+}
+
+export const updateOpeningMessage = (
+  id: string,
+  messageId: string,
+  patch: Partial<Pick<OpeningMessage, 'role' | 'content'>>
+): boolean => {
+  const preset = findPrompt(id)
+  if (!preset) {
+    return false
+  }
+  return updatePrompt(id, {
+    opening: preset.opening.map((message) =>
+      message.id === messageId ? { ...message, ...patch } : message
+    ),
+  })
+}
+
+export const removeOpeningMessage = (id: string, messageId: string): boolean => {
+  const preset = findPrompt(id)
+  if (!preset) {
+    return false
+  }
+  return updatePrompt(id, {
+    opening: preset.opening.filter((message) => message.id !== messageId),
   })
 }
 
@@ -196,6 +271,18 @@ export const resolveActiveSystemPrompt = (model: string): string => {
   const preset = presets.find((item) => item.id === activeId)
   const system = preset?.system.trim() ? preset.system : DEEPSEEK_DEFAULT_PROMPT
   return renderPrompt(system, model)
+}
+
+/**
+ * 当前预设的开场消息：内容做变量替换后返回，空行丢弃。
+ * 新对话建立时按顺序写入消息列表，既显示在界面上，也进入后续请求的上下文。
+ */
+export const resolveActiveOpening = (model: string): OpeningMessage[] => {
+  const { presets, activeId } = usePrompts.getState()
+  const preset = presets.find((item) => item.id === activeId)
+  return (preset?.opening ?? [])
+    .filter((message) => message.content.trim())
+    .map((message) => ({ ...message, content: renderPrompt(message.content, model) }))
 }
 
 /** 展示名：内置预设跟随界面语言，自定义预设用用户输入的名称 */

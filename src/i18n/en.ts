@@ -110,6 +110,19 @@ export const en = {
   promptSystemDescription:
     'Sent with every request. Leave it empty to use the DeepSeek default prompt.',
   promptVariables: 'Available variables (click to insert at the cursor)',
+  promptOpening: 'Opening messages',
+  promptOpeningDescription:
+    'Added to every new conversation in order: they appear in the chat and are sent to the model as example turns. Variable placeholders are supported; leave empty to start from a blank conversation.',
+  promptOpeningAdd: 'Add message',
+  promptOpeningEmpty: 'No opening messages yet',
+  promptOpeningRole: 'Message role',
+  promptOpeningUser: 'User',
+  promptOpeningAssistant: 'AI',
+  promptOpeningRemove: 'Delete',
+  promptOpeningUserPlaceholder: 'e.g. Hi, introduce yourself in one sentence',
+  promptOpeningAssistantPlaceholder:
+    'e.g. Hi, I can help with code, research and documents',
+  welcomeOpeningHint: 'These messages open every new conversation',
   promptVarDate: 'date',
   promptVarTime: 'time',
   promptVarWeekday: 'weekday',
