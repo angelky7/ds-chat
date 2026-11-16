@@ -92,6 +92,14 @@ export const createConfig = ({
           to: 'favicon.png',
           toType: 'file',
         },
+        // 图标与 manifest 放根目录，index.html 与 manifest 都用相对路径
+        { from: path.resolve(root, 'src/assets/icon-192.png'), to: 'icon-192.png', toType: 'file' },
+        { from: path.resolve(root, 'src/assets/icon-512.png'), to: 'icon-512.png', toType: 'file' },
+        { from: path.resolve(root, 'src/manifest.webmanifest'), to: 'manifest.webmanifest', toType: 'file' },
+        // 图标与 manifest 放根目录，index.html 与 manifest 都用相对路径
+        { from: path.resolve(root, 'src/assets/icon-192.png'), to: 'icon-192.png', toType: 'file' },
+        { from: path.resolve(root, 'src/assets/icon-512.png'), to: 'icon-512.png', toType: 'file' },
+        { from: path.resolve(root, 'src/manifest.webmanifest'), to: 'manifest.webmanifest', toType: 'file' },
       ],
     }),
   ],
