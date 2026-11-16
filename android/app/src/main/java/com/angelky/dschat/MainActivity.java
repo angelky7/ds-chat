@@ -64,11 +64,7 @@ public class MainActivity extends Activity {
         webView.setWebChromeClient(new Chrome());
 
         setContentView(webView);
-        if (savedInstanceState == null) {
-            webView.loadUrl(HOME_URL);
-        } else {
-            webView.restoreState(savedInstanceState);
-        }
+        webView.loadUrl(HOME_URL);
     }
 
     /** 白色状态栏 + 深色图标，与站点的浅色头部衔接 */
@@ -215,14 +211,6 @@ public class MainActivity extends Activity {
             return true;
         }
         return super.onKeyDown(keyCode, event);
-    }
-
-    @Override
-    protected void onSaveInstanceState(Bundle outState) {
-        super.onSaveInstanceState(outState);
-        if (webView != null) {
-            webView.saveState(outState);
-        }
     }
 
     @Override

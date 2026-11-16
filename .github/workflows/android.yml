@@ -58,6 +58,21 @@ jobs:
           cp android/app/build/outputs/apk/debug/app-debug.apk out/ds-chat.apk
           ls -lh out/ds-chat.apk
 
+      # 自检：包名、启动 Activity、关键文件缺一不可，任何一项不对就让构建失败
+      - name: Verify APK
+        run: |
+          set -euo pipefail
+          APK=out/ds-chat.apk
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/34.0.0"
+          unzip -l "$APK"
+          unzip -l "$APK" | grep -q "classes.dex"
+          unzip -l "$APK" | grep -q "resources.arsc"
+          "$BUILD_TOOLS/aapt" dump badging "$APK" > /tmp/badging.txt
+          head -30 /tmp/badging.txt
+          grep -q "package: name='com.angelky.dschat'" /tmp/badging.txt
+          grep -q "launchable-activity: name='com.angelky.dschat.MainActivity'" /tmp/badging.txt
+          grep -q "application-label:'DeepSeek'" /tmp/badging.txt
+
       - uses: actions/upload-artifact@v4
         with:
           name: ds-chat-apk
