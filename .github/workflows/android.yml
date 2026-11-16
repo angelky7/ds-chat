@@ -72,6 +72,8 @@ jobs:
           grep -q "package: name='com.angelky.dschat'" /tmp/badging.txt
           grep -q "launchable-activity: name='com.angelky.dschat.MainActivity'" /tmp/badging.txt
           grep -q "application-label:'DeepSeek'" /tmp/badging.txt
+          grep -q "application-icon-" /tmp/badging.txt
+          grep -q "uses-permission: name='android.permission.INTERNET'" /tmp/badging.txt
 
       - uses: actions/upload-artifact@v4
         with:
