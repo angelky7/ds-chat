@@ -1,0 +1,208 @@
+.hint {
+  flex-shrink: 0;
+  margin: 6px 0 4px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background-color: var(--dsw-alias-bg-skeleton);
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.switch {
+  position: relative;
+  flex: none;
+  box-sizing: border-box;
+  width: 40px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 11px;
+  background-color: var(--dsw-alias-border-l3);
+  cursor: pointer;
+  transition: background-color var(--ds-transition-duration) var(--ds-ease-in-out);
+
+  &:focus-visible {
+    outline: 2px solid var(--dsw-alias-brand-primary);
+    outline-offset: 2px;
+  }
+}
+
+.switchOn {
+  background-color: var(--dsw-alias-brand-primary);
+}
+
+.knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background-color: var(--dsw-static-neutral-bluish-00);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform var(--ds-transition-duration) var(--ds-ease-in-out);
+}
+
+.switchOn .knob {
+  transform: translateX(18px);
+}
+
+.avatarActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.colorRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.presets {
+  display: flex;
+  gap: 6px;
+}
+
+.preset {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: box-shadow var(--ds-transition-duration) var(--ds-ease-in-out);
+}
+
+.presetActive {
+  box-shadow:
+    0 0 0 2px var(--dsw-alias-bg-base),
+    0 0 0 3px var(--dsw-alias-brand-primary);
+}
+
+/* 原生取色器：色块下方藏一个透明 input，点击整块都能唤起系统取色器 */
+.swatch {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+
+  > input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: none;
+    opacity: 0;
+    cursor: pointer;
+  }
+}
+
+.swatchFill {
+  width: 100%;
+  height: 100%;
+}
+
+/* 未设置自定义色：显示斜线底纹，表示沿用默认 */
+.swatchEmpty {
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--dsw-alias-border-l2) 0 4px,
+    transparent 4px 8px
+  );
+
+  .swatchFill {
+    opacity: 0;
+  }
+}
+
+.linkButton {
+  flex: none;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--dsw-alias-brand-text);
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  cursor: pointer;
+
+  &:disabled {
+    color: var(--dsw-alias-label-caption);
+    cursor: default;
+  }
+
+  &:hover:not(:disabled) {
+    text-decoration: underline;
+  }
+}
+
+.backgroundCell {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.backgroundHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.backgroundRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.controlLabel {
+  flex: none;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.backgroundThumb {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.range {
+  flex: 1;
+  min-width: 120px;
+  accent-color: var(--dsw-alias-brand-primary);
+}
+
+.rangeValue {
+  flex: none;
+  min-width: 34px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+  text-align: end;
+}
+
+.footer {
+  display: flex;
+  flex-shrink: 0;
+  justify-content: flex-end;
+  padding: 14px 0 4px;
+}
+
+.resetConfirm {
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+}
