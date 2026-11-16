@@ -1,10 +1,17 @@
-# chat-demo
+# ds-chat
 
 [English](README.md) | 简体中文
 
-基于 DeepSeek API 的静态聊天示例。无需应用后端，浏览器直接请求配置的 API 服务。
+基于 DeepSeek 官方 [chat-demo](https://github.com/deepseek-ai/chat-demo) 的静态聊天前端，增加了多家模型服务商、系统提示词预设与外观自定义。无需应用后端，浏览器直接请求配置的 API 服务。
 
-点击 [在线体验](https://deepseek-ai.github.io/chat-demo/) 即可使用，也可以前往 [Releases](https://github.com/deepseek-ai/deepseek-chat-demo/releases) 下载压缩包，解压后双击 `index.html` 在本地使用，无需安装或构建。首次使用时，请在设置中填写 API Key。
+- 在线体验：<https://angelky7.github.io/ds-chat/>
+- 需要本地离线使用时可自行构建，产物为纯静态文件；首次使用时在「设置 → 模型服务」中填写对应服务商的 API Key。
+
+### 相对上游的改动
+
+- 模型服务：DeepSeek、Kimi、GLM、MiMo、通义千问、OpenRouter，各自独立保存 Key、地址与模型（见[模型服务](#模型服务)）。
+- 提示词：多套预设、变量占位符、开场消息与一键恢复默认（见[提示词](#提示词)）。
+- 外观：头像、气泡颜色、背景（见[自定义外观](#自定义外观)）。
 
 ## 运行
 

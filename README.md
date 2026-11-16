@@ -1,10 +1,17 @@
-# chat-demo
+# ds-chat
 
 English | [简体中文](README.zh-CN.md)
 
-A static chat demo powered by the DeepSeek API. No application backend is required: the browser connects directly to the configured API service.
+A static chat frontend based on the official DeepSeek [chat-demo](https://github.com/deepseek-ai/chat-demo), adding multiple model providers, system prompt presets and appearance customization. No application backend is required: the browser connects directly to the configured API service.
 
-You can [try the app online](https://deepseek-ai.github.io/chat-demo/) or download the archive from [Releases](https://github.com/deepseek-ai/deepseek-chat-demo/releases), extract it, and double-click `index.html` to use it locally without installation or a build. Enter your API key in Settings before your first chat.
+- Live demo: <https://angelky7.github.io/ds-chat/>
+- For offline use, build locally — the output is plain static files. Add the provider's API key under Settings → Providers before your first chat.
+
+### Changes from upstream
+
+- Providers: DeepSeek, Kimi, GLM, MiMo, Qwen and OpenRouter, each with its own key, endpoint and model (see [Providers](#providers)).
+- Prompts: multiple presets, variable placeholders, opening messages and one-click restore (see [Prompts](#prompts)).
+- Appearance: avatars, bubble colors and backgrounds (see [Appearance](#appearance)).
 
 ## Getting started
 
