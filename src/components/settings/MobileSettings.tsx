@@ -13,6 +13,7 @@ import {
   IconServerOutline16,
 } from '../base/icons.js'
 import { useTranslate, type TranslationKey } from '../../i18n/index.js'
+import { useEscapeLayer } from '../base/Modal.js'
 import { setLocale, setThemePreference, setTtsVoice, useSettings } from '../../services/settings.js'
 import { AppearanceSettings } from './AppearanceSettings.js'
 import { DataSettings } from './DataSettings.js'
@@ -149,6 +150,8 @@ export const MobileSettings = () => {
         : t('avatarMenuSettingsDialogThemeSelectSystemOption')
 
   const close = () => closeSettings()
+  // Esc 先退回列表，再关掉整页；和弹窗一样只由最上层响应
+  useEscapeLayer(() => (page === 'root' ? close() : setPage('root')))
 
   const body =
     page === 'root' ? (

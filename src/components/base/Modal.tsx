@@ -9,6 +9,29 @@ import styles from './Modal.module.css'
 /** 当前打开的弹窗，后打开的在末尾；叠放时 Esc 只关闭最上层 */
 const openModals: object[] = []
 
+/**
+ * 登记一层弹层：按 Esc 时只有最上层那层响应，避免一次按键关掉整叠。
+ * 弹窗与移动端整页设置都走这里，两者叠在一起时行为一致。
+ */
+export const useEscapeLayer = (onEscape: () => void) => {
+  const handler = useRef(onEscape)
+  handler.current = onEscape
+  useEffect(() => {
+    const token = {}
+    openModals.push(token)
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && openModals.at(-1) === token) {
+        handler.current()
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      openModals.splice(openModals.indexOf(token), 1)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [])
+}
+
 /** 遮罩 + 居中卡片，Esc / 点遮罩关闭 */
 export const Modal = ({
   title,
@@ -31,22 +54,7 @@ export const Modal = ({
 }) => {
   const t = useTranslate()
   const titleId = useId()
-  const onCloseRef = useRef(onClose)
-  onCloseRef.current = onClose
-  useEffect(() => {
-    const token = {}
-    openModals.push(token)
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && openModals.at(-1) === token) {
-        onCloseRef.current()
-      }
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      openModals.splice(openModals.indexOf(token), 1)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [])
+  useEscapeLayer(onClose)
 
   return createPortal(
     <div

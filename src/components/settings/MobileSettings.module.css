@@ -25,11 +25,9 @@
   align-items: center;
   flex-shrink: 0;
   gap: 8px;
-  height: 56px;
-  padding: 0 12px;
   box-sizing: border-box;
-  padding-top: env(safe-area-inset-top);
   height: calc(56px + env(safe-area-inset-top));
+  padding: env(safe-area-inset-top) 12px 0;
 }
 
 .headerButton {
