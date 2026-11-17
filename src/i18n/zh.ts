@@ -245,6 +245,7 @@ export const zh = {
   modelSwitchLabel: '选择模型',
   modelManage: '管理模型服务',
   historyImport: '导入历史对话',
+  historyImporting: '处理中…',
   historyImportConfirm: '确认导入',
   historyImportConfirmTitle: '确认导入历史对话？',
   historyImportConfirmDescription: '上传的历史对话会覆盖当前所有对话记录，是否确认导入？',

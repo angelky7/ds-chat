@@ -261,6 +261,7 @@ export const en = {
   modelSwitchLabel: 'Select model',
   modelManage: 'Manage providers',
   historyImport: 'Import chat history',
+  historyImporting: 'Working…',
   historyImportConfirm: 'Import',
   historyImportConfirmTitle: 'Import chat history?',
   historyImportConfirmDescription:

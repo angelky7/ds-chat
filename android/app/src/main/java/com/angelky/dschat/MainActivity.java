@@ -133,15 +133,8 @@ public class MainActivity extends Activity {
             intent.addCategory(Intent.CATEGORY_OPENABLE);
             intent.setType("*/*");
             intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
-            String[] accept = params.getAcceptTypes();
-            if (accept != null && accept.length > 0 && accept[0] != null && !accept[0].isEmpty()) {
-                // accept 里可能带 ".png,.jpg" 这类扩展名，MIME 通配更稳
-                intent.setType("*/*");
-                intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[] {"image/*", "application/pdf",
-                        "text/plain", "application/msword", "application/vnd.ms-powerpoint",
-                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        "application/vnd.openxmlformats-officedocument.presentationml.presentation"});
-            }
+            // 不要按网页 accept 再收窄 MIME：备份 .zip 常被系统归到 octet-stream，
+            // 旧白名单里没有 zip，文件选择器里会直接变灰不能选。统一放开，由网页校验格式。
             try {
                 startActivityForResult(Intent.createChooser(intent, getString(R.string.pick_file)), REQUEST_FILE);
             } catch (Exception e) {

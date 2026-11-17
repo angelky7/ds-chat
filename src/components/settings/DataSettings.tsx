@@ -119,15 +119,18 @@ const ImportHistory = ({
             size="m"
             className={clsx(styles.cellButton, styles.uploadButton)}
             disabled={disabled}
+            aria-busy={disabled || undefined}
+            title={disabled ? t('historyImporting') : undefined}
             onClick={() => inputRef.current?.click()}
           >
             <IconUploadOutline14 />
-            {t('upload')}
+            {disabled ? t('historyImporting') : t('upload')}
           </Button>
           <input
             ref={inputRef}
             type="file"
-            accept=".zip,application/zip,application/x-zip-compressed"
+            // 不写 accept：部分浏览器/安卓文件选择器会把 .zip 归到 octet-stream，
+            // 按扩展名过滤反而让备份文件变灰不可选。格式由 checkArchiveFormat 校验。
             hidden
             onChange={(event) => {
               const file = event.target.files?.[0]
