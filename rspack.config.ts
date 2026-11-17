@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from '@rspack/cli'
@@ -10,6 +11,24 @@ const root = path.dirname(fileURLToPath(import.meta.url))
 const { version } = JSON.parse(
   readFileSync(new URL('./package.json', import.meta.url), 'utf8')
 ) as { version: string }
+
+/** 当前提交的短 hash，拼进版本号便于按提交定位问题；非 git 环境（如直接下载源码）留空。 */
+const commitHash = (() => {
+  // CI 与本地都从 .git 读取；通过环境变量可显式覆盖。
+  if (process.env.DS_COMMIT) {
+    return process.env.DS_COMMIT.trim()
+  }
+  try {
+    return execFileSync('git', ['rev-parse', '--short=7', 'HEAD'], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+  } catch {
+    return ''
+  }
+})()
+const displayVersion = commitHash ? `${version} (${commitHash})` : version
 
 const cssLoader = {
   loader: 'builtin:lightningcss-loader',
@@ -80,7 +99,7 @@ export const createConfig = ({
     new rspack.HtmlRspackPlugin({
       template: './src/index.html',
       scriptLoading: 'defer',
-      meta: { 'application-version': version },
+      meta: { 'application-version': displayVersion },
     }),
     new rspack.DefinePlugin({ __API_ORIGIN__: JSON.stringify(apiOrigin) }),
     new rspack.CopyRspackPlugin({

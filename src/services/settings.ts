@@ -55,6 +55,10 @@ const write = (key: string, value: string | null) => {
 export const isChineseBrowser = (): boolean =>
   (typeof navigator === 'undefined' ? 'zh' : navigator.language).toLowerCase().startsWith('zh')
 
+/** 版本号由构建注入到 meta，读不到就返回空串。横竖屏设置都从这里取。 */
+export const appVersion = (): string =>
+  document.querySelector('meta[name="application-version"]')?.getAttribute('content') ?? ''
+
 const initialLocale = (): Locale => {
   const saved = read(KEYS.locale)
   if (saved === 'zh-CN' || saved === 'en-US') {

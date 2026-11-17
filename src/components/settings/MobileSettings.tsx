@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { useState, type ReactNode } from 'react'
+import { useState, type AnimationEvent, type ReactNode } from 'react'
 import {
   IconCheckedOutline14,
   IconChevronRightOutline14,
@@ -18,6 +18,7 @@ import { useTranslate, type TranslationKey } from '../../i18n/index.js'
 import { useEscapeLayer } from '../base/Modal.js'
 import { Switch } from '../base/Switch.js'
 import {
+  appVersion,
   setKeepRefusedAnswer,
   setLocale,
   setThemePreference,
@@ -58,10 +59,6 @@ const initialPage = (section: SettingsSection): Page => {
       return 'root'
   }
 }
-
-/** 版本号由构建注入到 meta，读不到就不显示这一行 */
-const appVersion = () =>
-  document.querySelector('meta[name="application-version"]')?.getAttribute('content') ?? ''
 
 const Group = ({ title, children }: { title: string; children: ReactNode }) => (
   <section className={styles.group}>
@@ -149,6 +146,8 @@ const SECTION_OF: Partial<Record<Page, SettingsSection>> = {
 export const MobileSettings = () => {
   const t = useTranslate()
   const [page, setPage] = useState<Page>(() => initialPage(useSettingsDialog.getState().section))
+  const [closing, setClosing] = useState(false)
+  const [direction, setDirection] = useState<'forward' | 'back'>('forward')
   const locale = useSettings((state) => state.locale)
   const themePreference = useSettings((state) => state.themePreference)
   const ttsVoice = useSettings((state) => state.ttsVoice)
@@ -164,11 +163,17 @@ export const MobileSettings = () => {
 
   /** 切页时同步给弹窗状态，窗口变宽后仍停在同一分组 */
   const go = (next: Page) => {
+    setDirection(next === 'root' ? 'back' : 'forward')
     useSettingsDialog.setState({ section: SECTION_OF[next] ?? 'general' })
     setPage(next)
   }
-  const close = () => closeSettings()
-  // Esc 先退回列表，再关掉整页；和弹窗一样只由最上层响应
+  // 关闭先播放淡出，动画结束再真正卸载；Esc 与顶部按钮走同一条路径
+  const close = () => setClosing(true)
+  const onPageAnimationEnd = (event: AnimationEvent<HTMLDivElement>) => {
+    if (closing && event.target === event.currentTarget) {
+      closeSettings()
+    }
+  }
   useEscapeLayer(() => (page === 'root' ? close() : go('root')))
 
   const body =
@@ -298,7 +303,13 @@ export const MobileSettings = () => {
     )
 
   return (
-    <div className={styles.page} role="dialog" aria-modal="true" aria-label={t(TITLES[page])}>
+    <div
+      className={clsx(styles.page, closing && styles.closing)}
+      role="dialog"
+      aria-modal="true"
+      aria-label={t(TITLES[page])}
+      onAnimationEnd={onPageAnimationEnd}
+    >
       <header className={styles.header}>
         <button
           type="button"
@@ -323,7 +334,12 @@ export const MobileSettings = () => {
         <div className={styles.title}>{t(TITLES[page])}</div>
         <span className={styles.headerSpacer} aria-hidden="true" />
       </header>
-      <div className={styles.body}>{body}</div>
+      <div
+        key={page}
+        className={clsx(styles.body, direction === 'back' ? styles.bodyBack : styles.bodyForward)}
+      >
+        {body}
+      </div>
     </div>
   )
 }

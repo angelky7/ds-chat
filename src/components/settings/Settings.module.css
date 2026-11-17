@@ -466,3 +466,9 @@
   opacity: 0;
   pointer-events: none;
 }
+
+/* 版本号只读展示：弱化的次要文字 */
+.versionValue {
+  color: var(--dsw-alias-label-tertiary);
+  white-space: nowrap;
+}

@@ -11,6 +11,7 @@ import {
   IconSettingsOutline16,
 } from '../base/icons.js'
 import {
+  appVersion,
   setKeepRefusedAnswer,
   setLocale,
   setThemePreference,
@@ -117,6 +118,7 @@ const SettingsContent = () => {
               <TtsVoiceSetting />
               <KeepRefusedSetting />
               <LocationSetting />
+              <VersionSetting />
             </>
           ) : section === 'prompts' ? (
             <PromptsSettings />
@@ -245,6 +247,22 @@ const KeepRefusedSetting = () => {
           onChange={setKeepRefusedAnswer}
         />
       }
+    />
+  )
+}
+
+/** 版本号：桌面端「通用设置」末尾展示，与移动端「关于」分组一致。 */
+const VersionSetting = () => {
+  const t = useTranslate()
+  const version = appVersion()
+  if (!version) {
+    return null
+  }
+  return (
+    <SettingCell
+      label={t('settingsVersion')}
+      status={null}
+      action={<span className={styles.versionValue}>{version}</span>}
     />
   )
 }

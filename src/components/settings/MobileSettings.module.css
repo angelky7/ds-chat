@@ -6,17 +6,62 @@
   flex-direction: column;
   color: var(--dsw-alias-label-primary);
   background-color: var(--dsw-static-neutral-bluish-75);
-  animation: enter 0.2s var(--ds-ease-in-out);
+  animation: enter 0.22s var(--ds-ease-in-out);
 }
 
 :global(body[data-ds-dark-theme]) .page {
   background-color: var(--dsw-alias-bg-base);
 }
 
+/* 关闭时先淡出，动画结束再卸载，避免整页瞬间消失 */
+.closing {
+  animation: leave 0.18s var(--ds-ease-in-out) forwards;
+  pointer-events: none;
+}
+
 @keyframes enter {
   from {
     opacity: 0;
     transform: translateY(8px);
+  }
+}
+
+@keyframes leave {
+  to {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* 二级页按 iOS 风格横向推进；返回时反向滑入 */
+.bodyForward {
+  animation: push-in 0.22s var(--ds-ease-in-out);
+}
+
+.bodyBack {
+  animation: pop-in 0.22s var(--ds-ease-in-out);
+}
+
+@keyframes push-in {
+  from {
+    opacity: 0.5;
+    transform: translateX(24px);
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0.5;
+    transform: translateX(-24px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page,
+  .closing,
+  .bodyForward,
+  .bodyBack {
+    animation: none;
   }
 }
 
