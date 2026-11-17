@@ -855,14 +855,16 @@ const ensureServerId = async (file: FileAttachment): Promise<string | null> => {
   if (!blob) {
     return null
   }
-  // 导入或旧版本存下的图片可能是不被支持的格式，补传前先转成 JPEG
-  if (file.isImage && !isSupportedImageType(blob.type || file.mimeType || '')) {
+  // 导入或旧版本存下的图片可能是不被支持的格式（HEIC 伪装成 jpg、CMYK、渐进式 JPEG）。
+  // 一律先过 prepareImageFile：它会对 JPEG 重新编码、对 PNG/GIF/WebP 原样保留。
+  if (file.isImage) {
     const converted = await prepareImageFile(
       new File([blob], file.name || 'image', { type: blob.type || file.mimeType || '' })
     )
     if (converted) {
       return uploadAttachment(activeApiKey(), file.id, converted, converted.name, true)
     }
+    // 无法解码时仍用原件补传，由服务端决定是否接受，避免直接丢失附件。
   }
   return uploadAttachment(activeApiKey(), file.id, blob, file.name, file.isImage)
 }

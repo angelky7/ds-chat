@@ -44,13 +44,23 @@ const renameToJpg = (name: string): string => {
   return `${dot > 0 ? name.slice(0, dot) : name}.jpg`
 }
 
+/** 文件名扩展名（小写，不含点），用于 MIME 缺失时识别伪装成 .jpg 的图片 */
+const getExt = (name: string): string => {
+  const dot = name.lastIndexOf('.')
+  return dot > 0 ? name.slice(dot + 1).toLowerCase() : ''
+}
+
 /**
  * 把图片转成接口支持的格式。已经是 JPEG/PNG/GIF/WebP 且体积正常时原样返回；
  * 无法解码（如 TIFF、PSD、SVG 的部分情况）时返回 null，由调用方提示用户。
  */
 export const prepareImageFile = async (file: File): Promise<File | null> => {
   const type = (file.type || '').toLowerCase()
-  if (isSupportedImageType(type) && file.size <= MAX_BYTES) {
+  const isJpeg = type === 'image/jpeg' || getExt(file.name) === 'jpg' || getExt(file.name) === 'jpeg'
+  // DeepSeek 按「文件内容」而非扩展名判断格式：iPhone 照片常是 CMYK、渐进式或 HEIC
+  // 伪装成 .jpg，原样上传会在发消息时被判「unsupported image」。因此 JPEG 一律重编码。
+  // PNG/GIF/WebP 本身格式固定，原样保留以免破坏动画与透明通道。
+  if (!isJpeg && isSupportedImageType(type) && file.size <= MAX_BYTES) {
     return file
   }
   const source = await decode(file)
