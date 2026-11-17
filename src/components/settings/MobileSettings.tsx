@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { useState, type AnimationEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type AnimationEvent, type ReactNode } from 'react'
 import {
   IconCheckedOutline14,
   IconChevronRightOutline14,
@@ -167,11 +167,40 @@ export const MobileSettings = () => {
     useSettingsDialog.setState({ section: SECTION_OF[next] ?? 'general' })
     setPage(next)
   }
-  // 关闭先播放淡出，动画结束再真正卸载；Esc 与顶部按钮走同一条路径
-  const close = () => setClosing(true)
+  // 关闭先播放淡出，动画结束再真正卸载；Esc 与顶部按钮走同一条路径。
+  // 不能只靠 animationend：部分平板开启「减弱动态效果」后动画被禁用（animation:none），
+  // 事件永不触发会导致点了关闭却卡在页面里。加一个超时兜底，保证任何情况下都能关掉。
+  const closeTimer = useRef<number | undefined>(undefined)
+  const finishClose = () => {
+    if (closeTimer.current !== undefined) {
+      window.clearTimeout(closeTimer.current)
+      closeTimer.current = undefined
+    }
+    closeSettings()
+  }
+  const close = () => {
+    if (closing) {
+      return
+    }
+    // 系统开启「减弱动态效果」时没有淡出动画，直接关闭，避免等待兜底计时器造成卡顿感。
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      closeSettings()
+      return
+    }
+    setClosing(true)
+    closeTimer.current = window.setTimeout(finishClose, 240)
+  }
+  useEffect(
+    () => () => {
+      if (closeTimer.current !== undefined) {
+        window.clearTimeout(closeTimer.current)
+      }
+    },
+    []
+  )
   const onPageAnimationEnd = (event: AnimationEvent<HTMLDivElement>) => {
     if (closing && event.target === event.currentTarget) {
-      closeSettings()
+      finishClose()
     }
   }
   useEscapeLayer(() => (page === 'root' ? close() : go('root')))
