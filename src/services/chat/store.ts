@@ -855,6 +855,15 @@ const ensureServerId = async (file: FileAttachment): Promise<string | null> => {
   if (!blob) {
     return null
   }
+  // 导入或旧版本存下的图片可能是不被支持的格式，补传前先转成 JPEG
+  if (file.isImage && !isSupportedImageType(blob.type || file.mimeType || '')) {
+    const converted = await prepareImageFile(
+      new File([blob], file.name || 'image', { type: blob.type || file.mimeType || '' })
+    )
+    if (converted) {
+      return uploadAttachment(activeApiKey(), file.id, converted, converted.name, true)
+    }
+  }
   return uploadAttachment(activeApiKey(), file.id, blob, file.name, file.isImage)
 }
 
