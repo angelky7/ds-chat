@@ -65,6 +65,11 @@
   }
 }
 
+/* 菜单打开期间保持「更多」按钮可见，指向的会话始终有落点 */
+.item:has([data-open]) .action {
+  display: flex;
+}
+
 @media not all and (min-width: 768px) {
   .item {
     height: 44px;

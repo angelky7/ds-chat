@@ -31,7 +31,7 @@ export const Menu = ({
 
   return (
     <>
-      <span ref={anchorRef} className={styles.anchor}>
+      <span ref={anchorRef} className={styles.anchor} data-open={open ? '' : undefined}>
         {children({ open, toggle: () => setOpen((value) => !value) })}
       </span>
       {open
@@ -39,7 +39,8 @@ export const Menu = ({
             <div
               ref={floatingRef}
               className={styles.menu}
-              style={position ?? undefined}
+              /* 还没量出位置前先不绘制，避免在 body 末尾闪一下再跳过去 */
+              style={position ?? { visibility: 'hidden' }}
               role="menu"
             >
               {options.map((option) => (
