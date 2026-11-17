@@ -70,7 +70,11 @@ Settings → Providers saves an API Key per provider and lets you **connect seve
 | MiMo | `https://api.xiaomimimo.com/anthropic` | Anthropic-compatible | ✅ |
 | Qwen | `https://maas.qianwenaiapi.com/compatible-mode/v1` | OpenAI-compatible | ✅ (`/apps/anthropic` returns 401 on preflight) |
 | Volcengine (Ark) | `https://ark.cn-beijing.volces.com/api/v3` | OpenAI-compatible | ✅ |
+| SiliconFlow | `https://api.siliconflow.cn/v1` | OpenAI-compatible | ✅ |
+| SiliconFlow | `https://api.siliconflow.cn/v1` | OpenAI-compatible | ✅ |
 | Volcengine (Ark) | `https://ark.cn-beijing.volces.com/api/v3` | OpenAI-compatible | ✅ |
+| SiliconFlow | `https://api.siliconflow.cn/v1` | OpenAI-compatible | ✅ |
+| SiliconFlow | `https://api.siliconflow.cn/v1` | OpenAI-compatible | ✅ |
 | OpenRouter | `https://openrouter.ai/api/v1` | OpenAI-compatible | ✅ |
 
 - Saving: the key row has its own **Save**, and endpoint / protocol / model list are committed with **Save settings** at the bottom. A saved key is masked; click the pencil icon to replace it.
@@ -81,6 +85,10 @@ Settings → Providers saves an API Key per provider and lets you **connect seve
 - While the built-in default prompt is unchanged, third-party providers receive no DeepSeek identity prompt; custom presets are still sent.
 - Volcengine uses Ark's OpenAI-compatible `/api/v3/chat/completions` with `doubao-seed-2-1-pro-260915` as the default model. Ark also exposes `/api/v3/responses` (the Responses API with a different request and event shape), which this app does not use. Ark does not expose `/api/v3/models`, so a key cannot be verified when saved; a bad key surfaces on the first message. Get a key at <https://ark.volcengine.com/region:cn-beijing/apikey>.
 - Volcengine uses Ark's OpenAI-compatible `/api/v3/chat/completions` with `doubao-seed-2-1-pro-260915` as the default model. Ark also exposes `/api/v3/responses` (the Responses API with a different request and event shape), which this app does not use. Ark does not expose `/api/v3/models`, so a key cannot be verified when saved; a bad key surfaces on the first message. Get a key at <https://ark.volcengine.com/region:cn-beijing/apikey>.
+- SiliconFlow aggregates DeepSeek, Qwen, GLM and Kimi models behind one key. Model IDs look like `deepseek-ai/DeepSeek-V3.2` or `Qwen/Qwen3-8B`; copy the full ID from its model catalog. Get a key at <https://cloud.siliconflow.cn/account/ak>.
+- Image attachments are re-encoded to JPEG before sending (long edge capped at 2048 px, quality 0.9). The APIs only accept JPEG/PNG/GIF/WebP, so BMP, TIFF, AVIF or SVG passed through unchanged are rejected as "unsupported image". Formats the browser cannot decode are reported instead of sent.
+- SiliconFlow aggregates DeepSeek, Qwen, GLM and Kimi models behind one key. Model IDs look like `deepseek-ai/DeepSeek-V3.2` or `Qwen/Qwen3-8B`; copy the full ID from its model catalog. Get a key at <https://cloud.siliconflow.cn/account/ak>.
+- Image attachments are re-encoded to JPEG before sending (long edge capped at 2048 px, quality 0.9). The APIs only accept JPEG/PNG/GIF/WebP, so BMP, TIFF, AVIF or SVG passed through unchanged are rejected as "unsupported image". Formats the browser cannot decode are reported instead of sent.
 - **CORS**: on a purely static deployment the browser calls each API directly, so an endpoint that does not allow cross-origin requests is blocked and the UI reports it. GLM needs a reverse proxy; keep Kimi and Qwen on their default OpenAI-compatible endpoints.
 
 ## Prompts

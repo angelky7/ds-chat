@@ -70,7 +70,11 @@ pnpm build
 | MiMo | `https://api.xiaomimimo.com/anthropic` | Anthropic 兼容 | ✅ |
 | 通义千问 | `https://maas.qianwenaiapi.com/compatible-mode/v1` | OpenAI 兼容 | ✅（`/apps/anthropic` 预检 401） |
 | 火山引擎（方舟） | `https://ark.cn-beijing.volces.com/api/v3` | OpenAI 兼容 | ✅ |
+| 硅基流动 | `https://api.siliconflow.cn/v1` | OpenAI 兼容 | ✅ |
+| 硅基流动 | `https://api.siliconflow.cn/v1` | OpenAI 兼容 | ✅ |
 | 火山引擎（方舟） | `https://ark.cn-beijing.volces.com/api/v3` | OpenAI 兼容 | ✅ |
+| 硅基流动 | `https://api.siliconflow.cn/v1` | OpenAI 兼容 | ✅ |
+| 硅基流动 | `https://api.siliconflow.cn/v1` | OpenAI 兼容 | ✅ |
 | OpenRouter | `https://openrouter.ai/api/v1` | OpenAI 兼容 | ✅ |
 
 - 保存方式：Key 处有「保存」，地址／协议／模型列表改完点底部「保存配置」，两者分别生效；Key 保存后只显示掩码，点铅笔图标可重新输入。
@@ -81,6 +85,10 @@ pnpm build
 - 未改动内置默认提示词时，其他服务商不会收到声明 DeepSeek 身份的系统提示词；自定义预设仍会照常发送。
 - 火山引擎用方舟的 OpenAI 兼容入口（`/api/v3/chat/completions`），默认模型 `doubao-seed-2-1-pro-260915`；方舟另有一个 `/api/v3/responses`（Responses API，请求体与事件格式不同），本应用不使用它。方舟未开放 `/api/v3/models`，所以 Key 保存时无法在线校验，错误会等到第一次对话才提示。Key 申请：<https://ark.volcengine.com/region:cn-beijing/apikey>。
 - 火山引擎用方舟的 OpenAI 兼容入口（`/api/v3/chat/completions`），默认模型 `doubao-seed-2-1-pro-260915`；方舟另有一个 `/api/v3/responses`（Responses API，请求体与事件格式不同），本应用不使用它。方舟未开放 `/api/v3/models`，所以 Key 保存时无法在线校验，错误会等到第一次对话才提示。Key 申请：<https://ark.volcengine.com/region:cn-beijing/apikey>。
+- 硅基流动聚合了 DeepSeek、Qwen、GLM、Kimi 等模型，一个 Key 即可切换；模型 ID 形如 `deepseek-ai/DeepSeek-V3.2`、`Qwen/Qwen3-8B`，以模型广场的完整 ID 为准。Key 申请：<https://cloud.siliconflow.cn/account/ak>。
+- 图片附件统一转成 JPEG 后再发送（长边不超过 2048 px，质量 0.9）：接口只接受 JPEG/PNG/GIF/WebP，BMP、TIFF、AVIF、SVG 等原样透传会被判为「unsupported image」。浏览器无法解码的格式会直接提示另存为 JPG 或 PNG。
+- 硅基流动聚合了 DeepSeek、Qwen、GLM、Kimi 等模型，一个 Key 即可切换；模型 ID 形如 `deepseek-ai/DeepSeek-V3.2`、`Qwen/Qwen3-8B`，以模型广场的完整 ID 为准。Key 申请：<https://cloud.siliconflow.cn/account/ak>。
+- 图片附件统一转成 JPEG 后再发送（长边不超过 2048 px，质量 0.9）：接口只接受 JPEG/PNG/GIF/WebP，BMP、TIFF、AVIF、SVG 等原样透传会被判为「unsupported image」。浏览器无法解码的格式会直接提示另存为 JPG 或 PNG。
 - **跨域限制**：纯静态部署时请求由浏览器直连各家接口，对方未开放 CORS 就会被浏览器拦截（界面上会提示「无法连接…」）。GLM 需要把接口地址改成自建反代；Kimi 与千问请保持默认的 OpenAI 兼容通道。
 
 ## 提示词

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { createId } from '../../utils/id.js'
+import { isSupportedImageType, prepareImageFile } from '../../utils/image.js'
 import { ApiError, streamMessage } from '../api/client.js'
 import { streamChatCompletion, toChatCompletion } from '../api/openai.js'
 import type { ChatModel, CreateMessageRequest } from '../api/types.js'
@@ -893,9 +894,21 @@ const inlineImages = async (
     if (!blob) {
       continue
     }
+    let source = blob
+    let mediaType = blob.type || file.mimeType || 'image/png'
+    // 历史附件可能是早期版本存下的 bmp/tiff 等格式，内联前再兜一次转换
+    if (!isSupportedImageType(mediaType)) {
+      const converted = await prepareImageFile(
+        new File([blob], file.name || 'image', { type: mediaType })
+      )
+      if (converted) {
+        source = converted
+        mediaType = 'image/jpeg'
+      }
+    }
     map.set(file.id, {
-      mediaType: blob.type || file.mimeType || 'image/png',
-      data: await readBase64(blob),
+      mediaType,
+      data: await readBase64(source),
     })
   }
   return (id) => map.get(id)

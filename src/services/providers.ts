@@ -14,6 +14,7 @@ export type ProviderId =
   | 'mimo'
   | 'qwen'
   | 'volcengine'
+  | 'siliconflow'
   | 'openrouter'
 
 /** 该服务商能做的事；不支持的功能在界面上隐藏，或在发送前拦下 */
@@ -154,6 +155,25 @@ export const PROVIDERS: ProviderPreset[] = [
     keysUrl: 'https://ark.volcengine.com/region:cn-beijing/apikey',
   },
   {
+    id: 'siliconflow',
+    label: '硅基流动',
+    // 预检返回 Access-Control-Allow-Origin: *，纯静态页面可直连；
+    // /v1/models 需要鉴权但确实存在，所以 Key 能在保存时校验
+    protocol: 'openai',
+    baseUrl: 'https://api.siliconflow.cn/v1',
+    model: 'deepseek-ai/DeepSeek-V3.2',
+    models: [
+      'deepseek-ai/DeepSeek-V3.2',
+      'deepseek-ai/DeepSeek-V4-Pro',
+      'deepseek-ai/DeepSeek-R1',
+      'Pro/moonshotai/Kimi-K2.6',
+      'Pro/zai-org/GLM-5.1',
+      'Qwen/Qwen3-8B',
+    ],
+    capabilities: { ...chatOnlyCapabilities, thinking: false },
+    keysUrl: 'https://cloud.siliconflow.cn/account/ak',
+  },
+  {
     id: 'openrouter',
     label: 'OpenRouter',
     // 只提供 OpenAI 兼容入口，预检允许跨域
@@ -199,6 +219,7 @@ const emptyItems = (): Record<ProviderId, ProviderConfig> => ({
   mimo: emptyConfig(),
   qwen: emptyConfig(),
   volcengine: emptyConfig(),
+  siliconflow: emptyConfig(),
   openrouter: emptyConfig(),
 })
 

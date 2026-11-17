@@ -1,8 +1,10 @@
 import { create } from 'zustand'
 import type { TranslationMessage } from '../../i18n/index.js'
 import { createId } from '../../utils/id.js'
+import { prepareImageFile } from '../../utils/image.js'
 import {
   cancelUpload,
+  getExtension,
   isImage,
   resolveMimeType,
   uploadAttachment,
@@ -60,12 +62,12 @@ const upload = (attachment: DraftAttachment, apiKey: string) => {
 }
 
 /** 整批校验通过后才创建预览和开始上传。 */
-export const addDraftFiles = (
+export const addDraftFiles = async (
   sessionId: string | null,
   files: File[],
   apiKey: string,
   local = false
-): TranslationMessage | null => {
+): Promise<TranslationMessage | null> => {
   if (files.length === 0) {
     return null
   }
@@ -73,7 +75,23 @@ export const addDraftFiles = (
   if (error) {
     return error
   }
-  const added = files.map((file): DraftAttachment => {
+  // 接口只认 JPEG/PNG/GIF/WebP，其余图片（bmp、tiff、avif、svg…）先转成 JPEG，
+  // 否则会在发送时被服务端判为「unsupported image」
+  const prepared: File[] = []
+  const failed: string[] = []
+  for (const file of files) {
+    if (!isImage(resolveMimeType(file))) {
+      prepared.push(file)
+      continue
+    }
+    const converted = await prepareImageFile(file)
+    if (converted) {
+      prepared.push(converted)
+    } else {
+      failed.push(getExtension(file.name) || 'IMAGE')
+    }
+  }
+  const added = prepared.map((file): DraftAttachment => {
     const image = isImage(resolveMimeType(file))
     return {
       id: createId(),
@@ -83,11 +101,18 @@ export const addDraftFiles = (
       local,
     }
   })
-  updateDraft(sessionId, (draft) => ({ ...draft, attachments: [...draft.attachments, ...added] }))
-  if (!local) {
-    added.forEach((attachment) => upload(attachment, apiKey))
+  if (added.length > 0) {
+    updateDraft(sessionId, (draft) => ({
+      ...draft,
+      attachments: [...draft.attachments, ...added],
+    }))
+    if (!local) {
+      added.forEach((attachment) => upload(attachment, apiKey))
+    }
   }
-  return null
+  return failed.length > 0
+    ? { key: 'uploadImageConvertFailed', params: { ext: [...new Set(failed)].join('、') } }
+    : null
 }
 
 export const retryDraftAttachment = (

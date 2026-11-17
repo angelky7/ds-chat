@@ -95,10 +95,11 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
     if (files.length === 0) {
       return
     }
-    const error = addDraftFiles(sessionId, files, activeApiKey(), inline)
-    if (error) {
-      showToast(error)
-    }
+    void addDraftFiles(sessionId, files, activeApiKey(), inline).then((error) => {
+      if (error) {
+        showToast(error)
+      }
+    })
   }
   const retryFile = useCallback(
     (id: string) => {
