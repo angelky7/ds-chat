@@ -99,6 +99,7 @@ export const zh = {
   settingsLocationRegion: '请选择国家或地区',
   settingsLanguageRegion: '语言与地区',
   settingsVersion: '版本',
+  updateAvailable: '发现新版本，点此刷新后使用',
   settingsBack: '返回',
   settingsGroupApp: '应用',
   settingsGroupChat: '对话',

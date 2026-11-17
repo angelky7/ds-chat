@@ -1,6 +1,7 @@
-import { useEffect, useLayoutEffect } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import { useTranslate } from '../i18n/index.js'
 import { useSettings } from '../services/settings.js'
+import { checkForUpdate } from './updateChecker.js'
 import { applyAppearance, useAppearance } from '../services/appearance.js'
 import { useTheme } from './theme.js'
 import { useIsMobile, useMobileViewport, usePreventPageScroll } from './viewport.js'
@@ -53,8 +54,18 @@ export const App = () => {
   const activeId = useChatStore((state) => state.activeId)
   const theme = useTheme()
   const appearance = useAppearance()
+  const [updateAvailable, setUpdateAvailable] = useState(false)
 
   usePreventPageScroll(isMobile)
+
+  useEffect(() => checkForUpdate(() => setUpdateAvailable(true)), [])
+
+  /** 带时间戳重载，强制绕过缓存的旧 HTML/JS */
+  const reloadLatest = () => {
+    const url = new URL(window.location.href)
+    url.searchParams.set('__v', String(Date.now()))
+    window.location.href = url.href
+  }
 
   // 头像、气泡与背景写进 CSS 变量；主题切换时按对应主题的配置重新应用
   useLayoutEffect(() => {
@@ -87,6 +98,11 @@ export const App = () => {
       <div ref={frameRef} className={styles.frame}>
         {isMobile ? <MobileSider /> : siderCollapsed ? null : <Sider />}
         <main className={styles.main}>
+          {updateAvailable ? (
+            <button type="button" className={styles.updateBanner} onClick={reloadLatest}>
+              {t('updateAvailable')}
+            </button>
+          ) : null}
           {saveError ? (
             <div className={styles.saveError} role="alert">
               <span>{t('sessionSaveFailed')}</span>

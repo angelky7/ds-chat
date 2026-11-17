@@ -105,6 +105,7 @@ export const en = {
   settingsLocationRegion: 'Select country or region',
   settingsLanguageRegion: 'Language & region',
   settingsVersion: 'Version',
+  updateAvailable: 'A new version is available. Tap to reload',
   settingsBack: 'Back',
   settingsGroupApp: 'App',
   settingsGroupChat: 'Chat',
