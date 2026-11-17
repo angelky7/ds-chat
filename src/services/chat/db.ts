@@ -10,6 +10,28 @@ export type StoredFile = {
   blob: Blob
 }
 
+/**
+ * IndexedDB 里的实际记录：iOS Safari 无法把 Blob 结构化克隆进 object store
+ * （报 "Error preparing Blob/File data to be stored in object store"），改存 eager 的
+ * ArrayBuffer + MIME；读取时再拼回 Blob。保留 blob 字段以兼容旧版本写入的记录。
+ * 存储结构（keyPath、store 名）未变，因此不需要升级 DB_VERSION。
+ */
+type StoredBlob = {
+  id: string
+  buffer?: ArrayBuffer
+  mimeType?: string
+  blob?: Blob
+}
+
+const toRecord = async (file: StoredFile): Promise<StoredBlob> => ({
+  id: file.id,
+  buffer: await file.blob.arrayBuffer(),
+  mimeType: file.blob.type,
+})
+
+const blobOf = (record: StoredBlob | undefined): Blob | undefined =>
+  record?.buffer ? new Blob([record.buffer], { type: record.mimeType }) : record?.blob
+
 /** 文件引用留在摘要中，删除会话时通过索引判断原件是否仍被引用。 */
 type StoredSessionSummary = SessionSummary & { fileIds: string[] }
 
@@ -22,13 +44,13 @@ interface ChatDB extends DBSchema {
     indexes: { fileIds: string }
   }
   /** 当前使用的文件原件 */
-  files: { key: string; value: StoredFile }
+  files: { key: string; value: StoredBlob }
   /**
    * 历史导入的暂存：导入过程中会话与原件只写入这两个存储，`sessions` / `files` 保持不变；
    * 全部校验通过后在一个事务中替换正式数据并清空暂存，失败时只清空暂存。
    */
   sessionsStaging: { key: string; value: Session }
-  filesStaging: { key: string; value: StoredFile }
+  filesStaging: { key: string; value: StoredBlob }
 }
 
 let dbPromise: Promise<IDBPDatabase<ChatDB>> | null = null
@@ -83,11 +105,13 @@ export const loadSession = async (id: string): Promise<Session | undefined> =>
 
 export const saveSession = async (session: Session, files: StoredFile[] = []): Promise<void> => {
   const summary = storedSummary(session)
+  // Blob → ArrayBuffer 必须在开事务前完成：事务里 await 非 IDB 的 Promise 会自动提交而失效。
+  const records = await Promise.all(files.map(toRecord))
   const tx = (await getDB()).transaction(['sessions', 'sessionSummaries', 'files'], 'readwrite')
   await Promise.all([
     (async () => {
       try {
-        for (const file of files) {
+        for (const file of records) {
           await tx.objectStore('files').put(file)
         }
         await tx.objectStore('sessions').put(session)
@@ -148,14 +172,15 @@ export const deleteSession = async (sessionId: string): Promise<void> => {
 }
 
 const putFiles = async (store: 'files' | 'filesStaging', files: StoredFile[]) => {
+  const records = await Promise.all(files.map(toRecord))
   const tx = (await getDB()).transaction(store, 'readwrite')
-  await Promise.all([...files.map((file) => tx.store.put(file)), tx.done])
+  await Promise.all([...records.map((file) => tx.store.put(file)), tx.done])
 }
 
 export const saveFiles = (files: StoredFile[]): Promise<void> => putFiles('files', files)
 
 export const loadFile = async (id: string): Promise<Blob | undefined> =>
-  (await (await getDB()).get('files', id))?.blob
+  blobOf(await (await getDB()).get('files', id))
 
 /** 清空导入暂存：开始导入前清除上次中断（如关闭页面）遗留的数据，导入失败后清除本次写入。 */
 export const clearStaging = async (): Promise<void> => {

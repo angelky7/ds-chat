@@ -49,12 +49,16 @@ const useHistoryImport = () => {
       const reason = error instanceof Error ? error.message : String(error)
       // 旧浏览器缺少新内置方法时会抛英文 TypeError，别把它原样展示给用户。
       const outdated = /is not a function|is not defined|undefined\)/i.test(reason)
+      // 设备存储空间不足 / IndexedDB 配额超限等本地写入失败，同样给出可操作的提示。
+      const storageFull = /quota|storage|object store|dataerror|constraint/i.test(reason)
       setStatus(
         error instanceof BackupError
           ? { key: 'historyImportFailedReason', reason: error.key, error: true }
           : outdated
             ? { key: 'historyImportOutdated', error: true }
-            : { key: 'historyImportFailedReason', params: { message: reason }, error: true }
+            : storageFull
+              ? { key: 'historyImportStorageFull', error: true }
+              : { key: 'historyImportFailedReason', params: { message: reason }, error: true }
       )
     } finally {
       importing.current = false
