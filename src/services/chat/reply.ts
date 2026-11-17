@@ -241,7 +241,10 @@ const isUsableReply = (message: Message): message is AssistantMessage =>
   !message.blocks.some((block) => block.type === 'text' && block.isTemplate) &&
   getReplyText(message) !== ''
 
-/** 有文件时用内容块数组：先文件后文本，文件按 Files API 的 file_id 引用或内联 base64 */
+/**
+ * 有文件时用内容块数组：先文件后文本，文件按 Files API 的 file_id 引用或内联 base64。
+ * files 由调用方先筛过：历史轮次的文档不进请求时直接传空数组。
+ */
 const toUserParam = (
   { content, files }: UserMessage,
   images?: ImageResolver
@@ -345,6 +348,20 @@ export const getContextRounds = (history: Message[]): [UserMessage, AssistantMes
 }
 
 /**
+ * 历史轮次的附件策略：附件正文在每次请求里都会重新计入输入长度，
+ * 同一份文档留在上下文里越久，越容易把整段对话顶出模型上限。
+ * - 文档一律不回传：解析后的正文往往上万 token，是超限的主因，内容已在当时的回答里消化；
+ * - 图片保留最近一轮：追问画面细节仍需要原图，单张成本有限。
+ */
+const HISTORIC_IMAGE_ROUNDS = 1
+
+/**
+ * 该轮只发了附件没写文字时用占位文本：既保住这一轮问答，也让模型知道
+ * 当时的附件正文已不在上下文里，不必假装看过。
+ */
+const OMITTED_ATTACHMENTS = '[Attached files in this round are no longer available in the context.]'
+
+/**
  * 把会话转成请求的 messages：只保留「提问 + 有回答的回复」成对的轮次，最后接上本轮提问。
  * 失败或没有回答的轮次不进上下文。续写时末尾再带上本轮 assistant。
  */
@@ -365,14 +382,27 @@ export const toRequestMessages = (
       previousReminder = reminder
     }
   }
-  for (const [user, reply] of getContextRounds(history)) {
+  const rounds = getContextRounds(history)
+  rounds.forEach(([user, reply], index) => {
+    const keepImages = index >= rounds.length - HISTORIC_IMAGE_ROUNDS
+    const files = keepImages ? user.files.filter((file) => file.isImage) : []
+    const blocks = toFileBlocks(files, images)
+    // 附件没能进请求（文档不回传，或本地已没有原件）时补一句说明，
+    // 既保住这一轮问答，也避免模型假装读过原文。
+    const content = [user.content, user.files.length > 0 && blocks.length === 0 ? OMITTED_ATTACHMENTS : '']
+      .filter(Boolean)
+      .join('\n\n')
     // 历史提问没有文字、附件也都没有可用内容时，提问为空，连同回答一起省略。
-    if (!user.content && toFileBlocks(user.files, images).length === 0) {
-      continue
+    if (!content) {
+      return
     }
     appendReminder(reply.latestReminder)
-    messages.push(toUserParam(user, images), toAssistantParam(reply))
-  }
+    messages.push(
+      // 没有可用块的附件不再传给 toUserParam，避免二次解析
+      toUserParam({ ...user, content, files: blocks.length > 0 ? files : [] }, images),
+      toAssistantParam(reply)
+    )
+  })
   appendReminder(latestReminder)
   messages.push(toUserParam(question, images))
   if (prefix?.prefix) {

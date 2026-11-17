@@ -80,6 +80,24 @@ export const extractFileIds = (message: string): string[] => [
   ...new Set(message.match(/file-api-[\w-]+/g) ?? []),
 ]
 
+/**
+ * 输入（历史上下文 + 附件正文）超过模型单次上限，服务端文案形如
+ * `user input too long, 69205 tokens exceeds max 32768 tokens`。
+ * 取出实际用量与上限；解析不到数字时仍按超限处理，交由调用方给通用文案。
+ */
+export const parseInputTooLong = (
+  message: string
+): { tokens?: number; limit?: number } | null => {
+  if (!/input (?:is )?too long|exceeds? (?:the )?max/i.test(message)) {
+    return null
+  }
+  const toNumber = (value?: string) => (value ? Number(value.replace(/,/g, '')) : undefined)
+  return {
+    tokens: toNumber(/([\d][\d,]*)\s*tokens?/i.exec(message)?.[1]),
+    limit: toNumber(/max(?:imum)?[^\d]{0,24}?([\d][\d,]*)/i.exec(message)?.[1]),
+  }
+}
+
 /** 上传失败里能识别出具体原因的情况；其余统一按「上传失败」处理 */
 export type UploadErrorCode = 'fileCountLimit' | 'storageLimit' | 'parseFailed'
 

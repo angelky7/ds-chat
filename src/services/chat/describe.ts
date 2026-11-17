@@ -1,5 +1,5 @@
 import { isTranslationKey, translate } from '../../i18n/index.js'
-import { classifyStatus } from '../api/errors.js'
+import { classifyStatus, parseInputTooLong } from '../api/errors.js'
 import type { AssistantMessage } from './types.js'
 
 export type Notice = {
@@ -30,6 +30,18 @@ export const describeReply = (reply: AssistantMessage): Notice | null => {
     }
     if (kind === 'network') {
       return { text: translate('commonNetworkErrorToast') }
+    }
+    // 超限属于参数问题，重试无用；给出具体用量，方便判断要删掉多少附件
+    const tooLong = parseInputTooLong(reply.error.message)
+    if (tooLong) {
+      return tooLong.tokens && tooLong.limit
+        ? {
+            text: translate('replyInputTooLong', {
+              tokens: tooLong.tokens.toLocaleString(),
+              limit: tooLong.limit.toLocaleString(),
+            }),
+          }
+        : { text: translate('replyInputTooLongUnknown') }
     }
     switch (classifyStatus(status)) {
       case 'unauthorized':
