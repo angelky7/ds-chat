@@ -101,7 +101,9 @@ export const App = () => {
             </div>
           ) : null}
           <div className={styles.content}>
-            {siderCollapsed ? <CollapsedSider /> : null}
+            {siderCollapsed && !session ? (
+              <CollapsedSider className={styles.collapsedBar} />
+            ) : null}
             {!ready || (activeId !== null && !session) ? (
               <div className={styles.loadingView}>
                 {isMobile ? <MobileHeader /> : null}

@@ -25,6 +25,14 @@
   min-height: 0;
 }
 
+/* 收起侧栏后，欢迎页与加载页没有顶栏，控件组直接浮在内容左上角 */
+.collapsedBar {
+  position: absolute;
+  top: 18px;
+  left: 16px;
+  z-index: 20;
+}
+
 .saveError {
   display: flex;
   align-items: center;

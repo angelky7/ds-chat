@@ -1,3 +1,4 @@
+import clsx from 'clsx'
 import logoUrl from '../../assets/deepseek-logo.png'
 import { IconPanelLeftOutline16, NewChatIcon } from '../base/icons.js'
 import { useTranslate } from '../../i18n/index.js'
@@ -6,11 +7,11 @@ import { newChat } from '../../services/chat/store.js'
 import { IconButton } from '../base/IconButton.js'
 import styles from './Sider.module.css'
 
-/** 收起后左上角的按钮组：标志、展开与新对话 */
-export const CollapsedSider = () => {
+/** 收起侧边栏后的左上角控件：标志、展开与新对话，按普通行内布局摆放 */
+export const CollapsedSider = ({ className }: { className?: string }) => {
   const t = useTranslate()
   return (
-    <div className={styles.collapsed}>
+    <div className={clsx(styles.collapsed, className)}>
       <button
         type="button"
         className={styles.collapsedLogo}

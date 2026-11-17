@@ -4,6 +4,7 @@ import { useTranslate } from '../../i18n/index.js'
 import type { Session } from '../../services/chat/types.js'
 import { ChatInput } from '../chatInput/ChatInput.js'
 import { MessageList } from '../messages/MessageList.js'
+import { CollapsedSider } from '../sider/CollapsedSider.js'
 import { MobileHeader } from './MobileHeader.js'
 import { PromptSwitcher } from './PromptSwitcher.js'
 import styles from './SessionView.module.css'
@@ -27,6 +28,7 @@ export const SessionView = ({
         <MobileHeader title={title} />
       ) : (
         <div className={styles.header}>
+          {siderCollapsed ? <CollapsedSider /> : null}
           <div className={clsx(styles.title, siderCollapsed && styles.withCollapsedSider)}>
             {title}
           </div>

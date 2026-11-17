@@ -187,15 +187,12 @@
   color: var(--dsw-alias-label-primary);
 }
 
+/* 收起侧栏后的控件组：会话页排在顶栏里，欢迎页浮在内容之上 */
 .collapsed {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 20;
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin: 12px 0 0 16px;
+  flex-shrink: 0;
+  gap: 12px;
 }
 
 .collapsedLogo {
@@ -203,11 +200,11 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   border: none;
-  border-radius: 12px;
+  border-radius: 10px;
   background: none;
   cursor: pointer;
   transition: background-color 0.15s ease;
@@ -226,13 +223,12 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  height: 40px;
-  padding: 0 2px;
+  height: 36px;
+  padding: 0 1px;
   box-sizing: border-box;
   border-radius: 100px;
   border: 1px solid var(--dsw-alias-border-l2);
   background: var(--dsw-alias-bg-layer-3);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
 }
 
 .drawer {
