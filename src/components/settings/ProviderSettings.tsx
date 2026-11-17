@@ -4,8 +4,11 @@ import { verifyApiKey } from '../../services/api/client.js'
 import { classifyApiError } from '../../services/api/errors.js'
 import {
   activeProvider,
+  addCustomProvider,
+  allProviders,
+  isCustomProvider,
   isMounted,
-  PROVIDERS,
+  removeCustomProvider,
   resetProviderConfig,
   resolveProvider,
   updateProviderConfig,
@@ -118,9 +121,11 @@ const KeyField = ({ provider }: { provider: ActiveProvider }) => {
     <Field
       label={t('providerApiKey')}
       action={
-        <a className={styles.link} href={provider.preset.keysUrl} target="_blank" rel="noreferrer">
-          {t('providerApiKeyGet')}
-        </a>
+        provider.preset.keysUrl ? (
+          <a className={styles.link} href={provider.preset.keysUrl} target="_blank" rel="noreferrer">
+            {t('providerApiKeyGet')}
+          </a>
+        ) : null
       }
     >
       {saved && !editing ? (
@@ -312,32 +317,155 @@ const ConnectionEditor = ({ provider }: { provider: ActiveProvider }) => {
   )
 }
 
+/** 自定义服务商表单：名称、地址、协议与模型，提交后立即接入 */
+const CustomProviderForm = ({ onCancel, onCreated }: { onCancel: () => void; onCreated: (id: ProviderId) => void }) => {
+  const t = useTranslate()
+  const [label, setLabel] = useState('')
+  const [baseUrl, setBaseUrl] = useState('')
+  const [protocol, setProtocol] = useState<ProviderProtocol>('openai')
+  const [models, setModels] = useState('')
+
+  const list = models
+    .split(/[\n,，]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+  const valid = label.trim() !== '' && /^https?:\/\//i.test(baseUrl.trim()) && list.length > 0
+
+  const submit = () => {
+    const id = addCustomProvider({ label, baseUrl, protocol, models: list })
+    if (!id) {
+      showToast({ key: 'providerCustomInvalid', type: 'error' })
+      return
+    }
+    showToast({ key: 'providerSaved' })
+    onCreated(id)
+  }
+
+  return (
+    <div className={styles.customForm}>
+      <Field label={t('providerCustomName')}>
+        <input
+          className={styles.input}
+          spellCheck={false}
+          autoComplete="off"
+          maxLength={30}
+          placeholder={t('providerCustomNamePlaceholder')}
+          value={label}
+          onChange={(event) => setLabel(event.target.value)}
+        />
+      </Field>
+      <Field label={t('providerBaseUrl')} hint={t('providerCustomUrlHint')}>
+        <input
+          className={styles.input}
+          spellCheck={false}
+          autoComplete="off"
+          placeholder="https://api.example.com/v1"
+          value={baseUrl}
+          onChange={(event) => setBaseUrl(event.target.value)}
+        />
+      </Field>
+      <Field label={t('providerProtocol')}>
+        <Select
+          ariaLabel={t('providerProtocol')}
+          className={styles.select}
+          value={protocol}
+          options={[
+            { value: 'openai', label: t('providerProtocolOpenai') },
+            { value: 'anthropic', label: t('providerProtocolAnthropic') },
+          ]}
+          onChange={(value) => setProtocol(value as ProviderProtocol)}
+        />
+      </Field>
+      <Field label={t('providerModels')} hint={t('providerCustomModelsHint')}>
+        <textarea
+          className={styles.customModels}
+          rows={2}
+          spellCheck={false}
+          placeholder="gpt-4o-mini, gpt-4o"
+          value={models}
+          onChange={(event) => setModels(event.target.value)}
+        />
+      </Field>
+      <div className={styles.customActions}>
+        <Button variant="outlined" size="m" onClick={onCancel}>
+          {t('providerCustomCancel')}
+        </Button>
+        <Button variant="primary" size="m" disabled={!valid} onClick={submit}>
+          {t('providerCustomAdd')}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 /** 模型服务：为每个服务商分别保存 Key、地址、协议与模型列表，可多家同时挂载 */
 export const ProviderSettings = () => {
   const t = useTranslate()
   useProviders()
   const current = activeProvider()
   const [editingId, setEditingId] = useState<ProviderId>(current.id)
+  const [creating, setCreating] = useState(false)
   const provider = resolveProvider(editingId)
+  const options = allProviders()
 
   return (
     <div className={styles.wrap}>
-      <Field label={t('providerService')} hint={t('providerServiceHint')}>
+      <Field
+        label={t('providerService')}
+        hint={t('providerServiceHint')}
+        action={
+          creating ? null : (
+            <div className={styles.headActions}>
+              {isCustomProvider(editingId) ? (
+                <button
+                  type="button"
+                  className={styles.dangerLink}
+                  onClick={() => {
+                    if (removeCustomProvider(editingId)) {
+                      showToast({ key: 'providerCustomRemoved' })
+                      setEditingId(activeProvider().id)
+                    }
+                  }}
+                >
+                  {t('providerCustomDelete')}
+                </button>
+              ) : null}
+              <button type="button" className={styles.link} onClick={() => setCreating(true)}>
+                {t('providerCustomNew')}
+              </button>
+            </div>
+          )
+        }
+      >
         <Select
           ariaLabel={t('providerService')}
           className={styles.select}
           value={editingId}
-          options={PROVIDERS.map((item) => ({
+          options={options.map((item) => ({
             value: item.id,
-            label: `${item.label} · ${t(isMounted(item.id) ? 'providerMounted' : 'providerNotMounted')}`,
+            label: `${item.label}${item.custom ? ` · ${t('providerCustomTag')}` : ''} · ${t(
+              isMounted(item.id) ? 'providerMounted' : 'providerNotMounted'
+            )}`,
           }))}
           onChange={(value) => setEditingId(value as ProviderId)}
         />
       </Field>
 
-      <div className={styles.switchHint}>{t('providerSwitchHint')}</div>
-      <KeyField key={`key-${editingId}`} provider={provider} />
-      <ConnectionEditor key={`conn-${editingId}`} provider={provider} />
+      {creating ? (
+        <CustomProviderForm
+          onCancel={() => setCreating(false)}
+          onCreated={(id) => {
+            setCreating(false)
+            setEditingId(id)
+          }}
+        />
+      ) : (
+        <>
+          <div className={styles.switchHint}>{t('providerSwitchHint')}</div>
+          <KeyField key={`key-${editingId}`} provider={provider} />
+          <ConnectionEditor key={`conn-${editingId}`} provider={provider} />
+        </>
+      )}
     </div>
   )
 }

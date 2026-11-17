@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { createId } from '../utils/id.js'
 import { API_ORIGIN } from './api/origin.js'
 
 /**
@@ -7,15 +8,8 @@ import { API_ORIGIN } from './api/origin.js'
  */
 export type ProviderProtocol = 'anthropic' | 'openai'
 
-export type ProviderId =
-  | 'deepseek'
-  | 'kimi'
-  | 'glm'
-  | 'mimo'
-  | 'qwen'
-  | 'volcengine'
-  | 'siliconflow'
-  | 'openrouter'
+/** 内置预设用固定 id，自定义服务商用 `custom-` 前缀的随机 id */
+export type ProviderId = string
 
 /** 该服务商能做的事；不支持的功能在界面上隐藏，或在发送前拦下 */
 export type ProviderCapabilities = {
@@ -46,13 +40,15 @@ export type ProviderPreset = {
   /** 常用模型，仅作输入提示，不限制用户填写 */
   models: string[]
   capabilities: ProviderCapabilities
-  /** 申请 Key 的地址 */
+  /** 申请 Key 的地址；自定义服务商没有 */
   keysUrl: string
   /**
    * 实测不允许浏览器跨域直连的协议（预检没有 Access-Control-Allow-Origin）。
    * 这些协议在纯静态部署下会被浏览器拦截，只能走自建反代。
    */
   corsBlocked?: ProviderProtocol[]
+  /** 用户自定义，可删除 */
+  custom?: boolean
 }
 
 const fullCapabilities: ProviderCapabilities = {
@@ -75,6 +71,17 @@ const chatOnlyCapabilities: ProviderCapabilities = {
   serverTitle: false,
   thinking: true,
 }
+
+/** 自定义服务商只保证最通用的能力，不猜对方有没有 Files API 或语音 */
+const customCapabilities = (protocol: ProviderProtocol): ProviderCapabilities => ({
+  files: false,
+  images: true,
+  search: false,
+  speech: false,
+  prefill: false,
+  serverTitle: false,
+  thinking: protocol === 'anthropic',
+})
 
 export const PROVIDERS: ProviderPreset[] = [
   {
@@ -186,8 +193,28 @@ export const PROVIDERS: ProviderPreset[] = [
   },
 ]
 
-export const findProvider = (id: ProviderId): ProviderPreset =>
-  PROVIDERS.find((item) => item.id === id) ?? PROVIDERS[0]
+/** 用户自己添加的服务商：填名称、地址、协议与模型即可接入任意兼容网关 */
+export type CustomProvider = {
+  id: ProviderId
+  label: string
+  protocol: ProviderProtocol
+  baseUrl: string
+  /** 默认模型，取 models[0] */
+  model: string
+  models: string[]
+}
+
+const toPreset = (item: CustomProvider): ProviderPreset => ({
+  id: item.id,
+  label: item.label,
+  protocol: item.protocol,
+  baseUrl: item.baseUrl,
+  model: item.model,
+  models: item.models,
+  capabilities: customCapabilities(item.protocol),
+  keysUrl: '',
+  custom: true,
+})
 
 export type ProviderConfig = {
   apiKey: string
@@ -204,6 +231,8 @@ export type ModelSelection = { providerId: ProviderId; model: string }
 
 type ProvidersState = {
   items: Record<ProviderId, ProviderConfig>
+  /** 自定义服务商的定义；内置预设不在这里 */
+  custom: CustomProvider[]
   /** null 表示尚未选择，回落到 DeepSeek 的预设模型 */
   selection: ModelSelection | null
 }
@@ -212,19 +241,8 @@ const KEY = 'chat-demo:providers'
 
 const emptyConfig = (): ProviderConfig => ({ apiKey: '', baseUrl: '', models: [], protocol: '' })
 
-const emptyItems = (): Record<ProviderId, ProviderConfig> => ({
-  deepseek: emptyConfig(),
-  kimi: emptyConfig(),
-  glm: emptyConfig(),
-  mimo: emptyConfig(),
-  qwen: emptyConfig(),
-  volcengine: emptyConfig(),
-  siliconflow: emptyConfig(),
-  openrouter: emptyConfig(),
-})
-
-const isProviderId = (value: unknown): value is ProviderId =>
-  typeof value === 'string' && PROVIDERS.some((item) => item.id === value)
+const emptyItems = (): Record<ProviderId, ProviderConfig> =>
+  Object.fromEntries(PROVIDERS.map((preset) => [preset.id, emptyConfig()]))
 
 const isProtocol = (value: unknown): value is ProviderProtocol =>
   value === 'anthropic' || value === 'openai'
@@ -247,46 +265,90 @@ const parseModels = (value: unknown): string[] =>
         .slice(0, 30)
     : []
 
+/** 自定义服务商的持久化校验：id 不能与内置预设冲突，地址必须是 http(s) */
+const parseCustom = (value: unknown): CustomProvider[] => {
+  if (!Array.isArray(value)) {
+    return []
+  }
+  const list: CustomProvider[] = []
+  const seen = new Set(PROVIDERS.map((preset) => preset.id))
+  for (const item of value) {
+    const source = (item ?? {}) as Record<string, unknown>
+    const id = typeof source.id === 'string' ? source.id : ''
+    const label = typeof source.label === 'string' ? source.label.trim() : ''
+    const baseUrl = typeof source.baseUrl === 'string' ? source.baseUrl.trim() : ''
+    if (!id || !label || !/^https?:\/\//i.test(baseUrl) || seen.has(id)) {
+      continue
+    }
+    const models = parseModels(source.models)
+    const model = typeof source.model === 'string' && source.model.trim() ? source.model.trim() : models[0]
+    if (!model) {
+      continue
+    }
+    seen.add(id)
+    list.push({
+      id,
+      label: label.slice(0, 30),
+      protocol: isProtocol(source.protocol) ? source.protocol : 'openai',
+      baseUrl: baseUrl.replace(/\/+$/, ''),
+      model,
+      models: models.length > 0 ? models : [model],
+    })
+    if (list.length >= 20) {
+      break
+    }
+  }
+  return list
+}
+
 /** 保存的数据可能来自旧版本或被手动改动，逐项校验后再使用 */
 const parseProviders = (value: unknown): ProvidersState => {
   const source = (value ?? {}) as Partial<Record<string, unknown>>
-  const stored = (source.items ?? {}) as Partial<Record<ProviderId, unknown>>
+  const stored = (source.items ?? {}) as Record<string, unknown>
+  const custom = parseCustom(source.custom)
   const items = emptyItems()
-  for (const preset of PROVIDERS) {
-    const config = (stored[preset.id] ?? {}) as Record<string, unknown>
+  for (const provider of [...PROVIDERS, ...custom.map(toPreset)]) {
+    const config = (stored[provider.id] ?? {}) as Record<string, unknown>
     const text = (key: 'apiKey' | 'baseUrl') =>
       typeof config[key] === 'string' ? (config[key] as string) : ''
     // 旧版只有单个 model 字段，迁移成模型列表
     const legacyModel = typeof config.model === 'string' ? config.model.trim() : ''
     const models = parseModels(config.models)
-    items[preset.id] = {
+    items[provider.id] = {
       apiKey: text('apiKey'),
       baseUrl: text('baseUrl'),
       models: models.length > 0 ? models : legacyModel ? [legacyModel] : [],
       protocol: isProtocol(config.protocol) ? config.protocol : '',
     }
   }
+  const known = new Set(Object.keys(items))
   const legacySelection = (source.selection ?? {}) as Partial<Record<keyof ModelSelection, unknown>>
   let selection: ModelSelection | null = null
-  if (isProviderId(legacySelection.providerId) && typeof legacySelection.model === 'string') {
+  if (
+    typeof legacySelection.providerId === 'string' &&
+    known.has(legacySelection.providerId) &&
+    typeof legacySelection.model === 'string'
+  ) {
     selection = { providerId: legacySelection.providerId, model: legacySelection.model }
-  } else if (isProviderId(source.activeId)) {
+  } else if (typeof source.activeId === 'string' && known.has(source.activeId)) {
     // 旧版只有「当前服务商」，模型取该服务商配置里的第一个
     const model = items[source.activeId].models[0] ?? findProvider(source.activeId).model
     selection = { providerId: source.activeId, model }
   }
-  return { items, selection }
+  return { items, custom, selection }
 }
 
 const load = (): ProvidersState => {
   let state: ProvidersState
   try {
     const raw = localStorage.getItem(KEY)
-    state = raw ? parseProviders(JSON.parse(raw)) : { items: emptyItems(), selection: null }
+    state = raw
+      ? parseProviders(JSON.parse(raw))
+      : { items: emptyItems(), custom: [], selection: null }
   } catch {
-    state = { items: emptyItems(), selection: null }
+    state = { items: emptyItems(), custom: [], selection: null }
   }
-  if (!state.items.deepseek.apiKey) {
+  if (!state.items.deepseek?.apiKey) {
     const legacy = readLegacyApiKey()
     if (legacy) {
       state = {
@@ -314,9 +376,24 @@ const commit = (next: ProvidersState): boolean => {
   return save(next)
 }
 
+/** 全部可选服务商：内置预设在前，自定义在后 */
+export const allProviders = (): ProviderPreset[] => [
+  ...PROVIDERS,
+  ...useProviders.getState().custom.map(toPreset),
+]
+
+export const findProvider = (id: ProviderId): ProviderPreset =>
+  allProviders().find((item) => item.id === id) ?? PROVIDERS[0]
+
+export const isCustomProvider = (id: ProviderId): boolean =>
+  useProviders.getState().custom.some((item) => item.id === id)
+
+const configOf = (id: ProviderId): ProviderConfig =>
+  useProviders.getState().items[id] ?? emptyConfig()
+
 export const updateProviderConfig = (id: ProviderId, patch: Partial<ProviderConfig>): boolean => {
   const state = useProviders.getState()
-  const config = { ...state.items[id], ...patch }
+  const config = { ...configOf(id), ...patch }
   let { selection } = state
   // 正在使用的模型被从列表里删掉时，回落到列表第一个，避免继续请求一个已删除的模型
   if (patch.models && selection?.providerId === id && !patch.models.includes(selection.model)) {
@@ -329,25 +406,27 @@ export const updateProviderConfig = (id: ProviderId, patch: Partial<ProviderConf
   })
 }
 
-/** 地址、模型与协议回到预设值，已保存的 Key 保留 */
+/** 地址、模型与协议回到预设值，已保存的 Key 保留；自定义服务商回到它自己的定义 */
 export const resetProviderConfig = (id: ProviderId): boolean => {
   const state = useProviders.getState()
   return commit({
     ...state,
-    items: { ...state.items, [id]: { ...state.items[id], baseUrl: '', models: [], protocol: '' } },
+    items: {
+      ...state.items,
+      [id]: { ...configOf(id), baseUrl: '', models: [], protocol: '' },
+    },
   })
 }
 
 /** 该服务商是否已挂载（保存了 Key） */
-export const isMounted = (id: ProviderId): boolean =>
-  useProviders.getState().items[id].apiKey.trim() !== ''
+export const isMounted = (id: ProviderId): boolean => configOf(id).apiKey.trim() !== ''
 
 /** 该服务商可选的模型列表：自定义优先，否则用预设 */
 export const effectiveModels = (id: ProviderId): string[] => {
   const preset = findProvider(id)
-  const custom = useProviders.getState().items[id].models
+  const custom = configOf(id).models
   const models = custom.length > 0 ? custom : preset.models
-  return models.length > 0 ? models : [preset.model]
+  return models.length > 0 ? models : preset.model ? [preset.model] : []
 }
 
 export type ActiveProvider = {
@@ -383,7 +462,7 @@ const capabilitiesFor = (
 /** 组装某个服务商的生效配置；model 缺省时用列表第一个 */
 export const resolveProvider = (id: ProviderId, model?: string): ActiveProvider => {
   const preset = findProvider(id)
-  const config = useProviders.getState().items[id]
+  const config = configOf(id)
   const protocol = config.protocol || preset.protocol
   const models = effectiveModels(id)
   return {
@@ -409,12 +488,99 @@ export const activeApiKey = (): string => activeProvider().apiKey
 
 /** 所有已挂载的服务商，用于模型选择器分组展示 */
 export const mountedProviders = (): ActiveProvider[] =>
-  PROVIDERS.filter((preset) => isMounted(preset.id)).map((preset) => resolveProvider(preset.id))
+  allProviders()
+    .filter((preset) => isMounted(preset.id))
+    .map((preset) => resolveProvider(preset.id))
 
 /** 切换当前模型；可以指向任何已挂载服务商的任意模型 */
 export const setSelection = (providerId: ProviderId, model: string): boolean => {
   const state = useProviders.getState()
   return commit({ ...state, selection: { providerId, model } })
+}
+
+export type CustomProviderInput = {
+  label: string
+  baseUrl: string
+  protocol: ProviderProtocol
+  models: string[]
+}
+
+/** 新增自定义服务商，同名不阻止；返回新 id，参数不合法时返回 null */
+export const addCustomProvider = (input: CustomProviderInput): ProviderId | null => {
+  const label = input.label.trim()
+  const baseUrl = input.baseUrl.trim().replace(/\/+$/, '')
+  const models = input.models.map((item) => item.trim()).filter(Boolean).slice(0, 30)
+  if (!label || !/^https?:\/\//i.test(baseUrl) || models.length === 0) {
+    return null
+  }
+  const state = useProviders.getState()
+  if (state.custom.length >= 20) {
+    return null
+  }
+  const item: CustomProvider = {
+    id: `custom-${createId()}`,
+    label: label.slice(0, 30),
+    protocol: input.protocol,
+    baseUrl,
+    model: models[0],
+    models,
+  }
+  const ok = commit({
+    ...state,
+    custom: [...state.custom, item],
+    items: { ...state.items, [item.id]: emptyConfig() },
+    selection: { providerId: item.id, model: item.model },
+  })
+  return ok ? item.id : null
+}
+
+export const updateCustomProvider = (
+  id: ProviderId,
+  patch: Partial<CustomProviderInput>
+): boolean => {
+  const state = useProviders.getState()
+  const target = state.custom.find((item) => item.id === id)
+  if (!target) {
+    return false
+  }
+  const label = patch.label?.trim() ?? target.label
+  const baseUrl = (patch.baseUrl?.trim() ?? target.baseUrl).replace(/\/+$/, '')
+  const models = patch.models ? patch.models.map((item) => item.trim()).filter(Boolean) : target.models
+  if (!label || !/^https?:\/\//i.test(baseUrl) || models.length === 0) {
+    return false
+  }
+  const next: CustomProvider = {
+    ...target,
+    label: label.slice(0, 30),
+    baseUrl,
+    models: models.slice(0, 30),
+    model: models[0],
+    protocol: patch.protocol ?? target.protocol,
+  }
+  return commit({
+    ...state,
+    custom: state.custom.map((item) => (item.id === id ? next : item)),
+  })
+}
+
+/** 删除自定义服务商，连同它的 Key 与选中项一起清掉 */
+export const removeCustomProvider = (id: ProviderId): boolean => {
+  const state = useProviders.getState()
+  if (!state.custom.some((item) => item.id === id)) {
+    return false
+  }
+  const items = Object.fromEntries(
+    Object.entries(state.items).filter(([providerId]) => providerId !== id)
+  )
+  return commit({
+    ...state,
+    custom: state.custom.filter((item) => item.id !== id),
+    items,
+    selection:
+      state.selection?.providerId === id
+        ? { providerId: 'deepseek', model: PROVIDERS[0].model }
+        : state.selection,
+  })
 }
 
 /** 当前协议是否被实测判定为浏览器无法直连（需要自建反代或换协议） */
@@ -425,6 +591,7 @@ export const isCorsBlocked = (provider: ActiveProvider): boolean =>
 export const useActiveProvider = (): ActiveProvider => {
   useProviders((state) => state.selection)
   useProviders((state) => state.items)
+  useProviders((state) => state.custom)
   return activeProvider()
 }
 

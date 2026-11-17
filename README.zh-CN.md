@@ -86,8 +86,12 @@ pnpm build
 - 火山引擎用方舟的 OpenAI 兼容入口（`/api/v3/chat/completions`），默认模型 `doubao-seed-2-1-pro-260915`；方舟另有一个 `/api/v3/responses`（Responses API，请求体与事件格式不同），本应用不使用它。方舟未开放 `/api/v3/models`，所以 Key 保存时无法在线校验，错误会等到第一次对话才提示。Key 申请：<https://ark.volcengine.com/region:cn-beijing/apikey>。
 - 火山引擎用方舟的 OpenAI 兼容入口（`/api/v3/chat/completions`），默认模型 `doubao-seed-2-1-pro-260915`；方舟另有一个 `/api/v3/responses`（Responses API，请求体与事件格式不同），本应用不使用它。方舟未开放 `/api/v3/models`，所以 Key 保存时无法在线校验，错误会等到第一次对话才提示。Key 申请：<https://ark.volcengine.com/region:cn-beijing/apikey>。
 - 硅基流动聚合了 DeepSeek、Qwen、GLM、Kimi 等模型，一个 Key 即可切换；模型 ID 形如 `deepseek-ai/DeepSeek-V3.2`、`Qwen/Qwen3-8B`，以模型广场的完整 ID 为准。Key 申请：<https://cloud.siliconflow.cn/account/ak>。
+- **自定义服务商**：设置 → 模型服务 → 右上角「＋ 自定义」，填名称、接口地址、协议（OpenAI 兼容 / Anthropic 兼容）与模型列表即可接入任意兼容网关（one-api、new-api、LiteLLM、自建反代都行）。地址填到 `/chat/completions` 或 `/v1/messages` 之前的部分；多个模型用逗号或换行分隔，第一个作为默认。自定义项只提供对话与图片能力，最多 20 个，可随时删除（连同 Key 一起清掉）。
+- **自定义服务商**：设置 → 模型服务 → 右上角「＋ 自定义」，填名称、接口地址、协议（OpenAI 兼容 / Anthropic 兼容）与模型列表即可接入任意兼容网关（one-api、new-api、LiteLLM、自建反代都行）。地址填到 `/chat/completions` 或 `/v1/messages` 之前的部分；多个模型用逗号或换行分隔，第一个作为默认。自定义项只提供对话与图片能力，最多 20 个，可随时删除（连同 Key 一起清掉）。
 - 图片附件统一转成 JPEG 后再发送（长边不超过 2048 px，质量 0.9）：接口只接受 JPEG/PNG/GIF/WebP，BMP、TIFF、AVIF、SVG 等原样透传会被判为「unsupported image」。浏览器无法解码的格式会直接提示另存为 JPG 或 PNG。
 - 硅基流动聚合了 DeepSeek、Qwen、GLM、Kimi 等模型，一个 Key 即可切换；模型 ID 形如 `deepseek-ai/DeepSeek-V3.2`、`Qwen/Qwen3-8B`，以模型广场的完整 ID 为准。Key 申请：<https://cloud.siliconflow.cn/account/ak>。
+- **自定义服务商**：设置 → 模型服务 → 右上角「＋ 自定义」，填名称、接口地址、协议（OpenAI 兼容 / Anthropic 兼容）与模型列表即可接入任意兼容网关（one-api、new-api、LiteLLM、自建反代都行）。地址填到 `/chat/completions` 或 `/v1/messages` 之前的部分；多个模型用逗号或换行分隔，第一个作为默认。自定义项只提供对话与图片能力，最多 20 个，可随时删除（连同 Key 一起清掉）。
+- **自定义服务商**：设置 → 模型服务 → 右上角「＋ 自定义」，填名称、接口地址、协议（OpenAI 兼容 / Anthropic 兼容）与模型列表即可接入任意兼容网关（one-api、new-api、LiteLLM、自建反代都行）。地址填到 `/chat/completions` 或 `/v1/messages` 之前的部分；多个模型用逗号或换行分隔，第一个作为默认。自定义项只提供对话与图片能力，最多 20 个，可随时删除（连同 Key 一起清掉）。
 - 图片附件统一转成 JPEG 后再发送（长边不超过 2048 px，质量 0.9）：接口只接受 JPEG/PNG/GIF/WebP，BMP、TIFF、AVIF、SVG 等原样透传会被判为「unsupported image」。浏览器无法解码的格式会直接提示另存为 JPG 或 PNG。
 - **跨域限制**：纯静态部署时请求由浏览器直连各家接口，对方未开放 CORS 就会被浏览器拦截（界面上会提示「无法连接…」）。GLM 需要把接口地址改成自建反代；Kimi 与千问请保持默认的 OpenAI 兼容通道。
 
