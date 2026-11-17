@@ -282,7 +282,7 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
             ref={fileInputRef}
             type="file"
             multiple
-            hidden
+            className={styles.fileInput}
             accept={inline ? 'image/*' : ACCEPT}
             onChange={(event) => {
               acceptFiles(Array.from(event.target.files ?? []))

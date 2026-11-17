@@ -330,3 +330,13 @@
     cursor: not-allowed;
   }
 }
+/* 隐藏但保留可交互性：部分移动浏览器会忽略 hidden / display:none 的 file input */
+.fileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}

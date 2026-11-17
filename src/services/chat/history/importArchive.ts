@@ -1,4 +1,5 @@
 import * as db from '../db.js'
+import type { Session } from '../types.js'
 import { BackupError, fail } from './errors.js'
 import type { SessionIndexEntry } from './format.js'
 import { INDEX_PATH, MANIFEST_PATH, USER_PATH, parseSessionPath, sessionFilesDir } from './paths.js'
@@ -41,6 +42,13 @@ const imageType = (bytes: Uint8Array): string => {
   return ''
 }
 
+/**
+ * 部分系统压缩工具会在归档前面插入元数据条目或把 user.json 排到最前；
+ * 这些条目不属于会话数据，允许出现在 manifest 之前，避免手机端选到的文件被误判。
+ */
+const isPreamble = (path: string) =>
+  path === USER_PATH || path.startsWith('__MACOSX/') || path === '.DS_Store' || path === 'Thumbs.db'
+
 const readJson = async (entry: ArchiveEntry): Promise<unknown> => {
   const text = await (await readEntry(entry)).text()
   try {
@@ -60,6 +68,10 @@ export const checkArchiveFormat = async (file: File): Promise<void> => {
   }
   try {
     for await (const entry of readArchive(file)) {
+      if (isPreamble(entry.path)) {
+        await skipEntry(entry)
+        continue
+      }
       if (entry.path !== MANIFEST_PATH) {
         fail('backupUnrecognized')
       }
@@ -90,6 +102,22 @@ export const importArchive = async (file: File): Promise<void> => {
   let index: SessionIndexEntry[] | undefined
   let currentSessionId: string | undefined
 
+  // 分批写入暂存：逐条/逐张开事务在手机上开销很大。
+  const pendingSessions: Session[] = []
+  const pendingFiles: db.StoredFile[] = []
+  let pendingFileBytes = 0
+  const flushSessions = async () => {
+    if (pendingSessions.length) {
+      await db.addStagingSessions(pendingSessions.splice(0))
+    }
+  }
+  const flushFiles = async () => {
+    if (pendingFiles.length) {
+      await db.saveStagingFiles(pendingFiles.splice(0))
+      pendingFileBytes = 0
+    }
+  }
+
   const saveImage = async (entry: ArchiveEntry, id: string) => {
     if (stored.has(id)) {
       await skipEntry(entry)
@@ -97,15 +125,21 @@ export const importArchive = async (file: File): Promise<void> => {
     }
     const data = await readEntry(entry)
     const type = imageType(new Uint8Array(await data.slice(0, 16).arrayBuffer()))
-    await db.saveStagingFiles([{ id, blob: new Blob([data], { type }) }])
+    pendingFiles.push({ id, blob: new Blob([data], { type }) })
+    pendingFileBytes += data.size
     stored.set(id, type)
+    if (pendingFiles.length >= 20 || pendingFileBytes >= 8 * 1024 * 1024) {
+      await flushFiles()
+    }
   }
 
   try {
     for await (const entry of readArchive(file)) {
       const { path } = entry
       const sessionId = parseSessionPath(path)
-      if (!manifest) {
+      if (!manifest && isPreamble(path)) {
+        await skipEntry(entry)
+      } else if (!manifest) {
         if (path !== MANIFEST_PATH) {
           fail('backupUnrecognized')
         }
@@ -124,7 +158,10 @@ export const importArchive = async (file: File): Promise<void> => {
         for (const [imagePath, id] of local.images) {
           images.set(imagePath, id)
         }
-        await db.addStagingSession(local.session)
+        pendingSessions.push(local.session)
+        if (pendingSessions.length >= 25) {
+          await flushSessions()
+        }
       } else if (path === INDEX_PATH && !index) {
         index = readSessionIndex(await readJson(entry))
       } else if (
@@ -155,5 +192,7 @@ export const importArchive = async (file: File): Promise<void> => {
   ) {
     fail('backupIncomplete')
   }
+  await flushSessions()
+  await flushFiles()
   await db.updateStagingFileTypes(stored)
 }

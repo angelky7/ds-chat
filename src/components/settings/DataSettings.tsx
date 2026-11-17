@@ -45,8 +45,17 @@ const useHistoryImport = () => {
     try {
       const count = await importHistory(file)
       setStatus({ key: count === 1 ? 'historyImportedOne' : 'historyImported', params: { count } })
-    } catch {
-      setStatus({ key: 'historyImportFailed', error: true })
+    } catch (error) {
+      // 展示具体原因（版本不符、ZIP 损坏、JSON 错误等），便于判断是文件问题还是浏览器问题。
+      setStatus(
+        error instanceof BackupError
+          ? { key: 'historyImportFailedReason', reason: error.key, error: true }
+          : {
+              key: 'historyImportFailedReason',
+              params: { message: error instanceof Error ? error.message : String(error) },
+              error: true,
+            }
+      )
     } finally {
       importing.current = false
       setBusy(false)
@@ -131,7 +140,8 @@ const ImportHistory = ({
             type="file"
             // 不写 accept：部分浏览器/安卓文件选择器会把 .zip 归到 octet-stream，
             // 按扩展名过滤反而让备份文件变灰不可选。格式由 checkArchiveFormat 校验。
-            hidden
+            // 也不使用 hidden：部分移动浏览器会禁用隐藏 input 的 programmatically click。
+            className={styles.fileInput}
             onChange={(event) => {
               const file = event.target.files?.[0]
               event.target.value = ''

@@ -2,7 +2,8 @@ import { Inflate } from 'fflate'
 
 const READ_CHUNK_BYTES = 256 * 1024
 // 控制每轮同步解压的工作量；输出交给调用方保存后才继续读取。
-const INFLATE_CHUNK_BYTES = 8 * 1024
+// 8KB 时每个图片会产生上百次 yield 与 Blob 创建，在手机上明显拖慢导入。
+const INFLATE_CHUNK_BYTES = 64 * 1024
 
 /** ZIP 结构损坏或使用了不支持的特性 */
 export class ArchiveError extends Error {
@@ -24,13 +25,59 @@ export const isZipFile = async (file: File) => {
 
 const viewOf = (bytes: Uint8Array) => new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 
-const crcTable = Uint32Array.from({ length: 256 }, (_, value) => {
-  let crc = value
-  for (let bit = 0; bit < 8; bit++) {
-    crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0)
+/** 标准 CRC32 单字节表。 */
+const crcByteTable = (() => {
+  const table = new Uint32Array(256)
+  for (let value = 0; value < 256; value++) {
+    let crc = value
+    for (let bit = 0; bit < 8; bit++) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0)
+    }
+    table[value] = crc >>> 0
+  }
+  return table
+})()
+
+/**
+ * CRC32 分块查表：一次处理 8 字节，手机上大归档的逐字节循环开销明显更低。
+ * 四张表由「处理 4 个 0 字节」的线性变换按字节位置生成，可与逐字节算法逐位对齐。
+ */
+const crcBlockTables = (() => {
+  const zeroByte = (crc: number) => ((crc >>> 8) ^ crcByteTable[crc & 0xff]) >>> 0
+  const fourZeroBytes = (value: number) => {
+    let crc = value >>> 0
+    for (let index = 0; index < 4; index++) {
+      crc = zeroByte(crc)
+    }
+    return crc >>> 0
+  }
+  return [0, 1, 2, 3].map((position) => {
+    const table = new Uint32Array(256)
+    for (let value = 0; value < 256; value++) {
+      table[value] = fourZeroBytes((value << (position * 8)) >>> 0)
+    }
+    return table
+  })
+})()
+
+const updateCrc = (crc: number, bytes: Uint8Array): number => {
+  const view = viewOf(bytes)
+  const eight = (value: number) =>
+    (crcBlockTables[3][value >>> 24] ^
+      crcBlockTables[2][(value >>> 16) & 0xff] ^
+      crcBlockTables[1][(value >>> 8) & 0xff] ^
+      crcBlockTables[0][value & 0xff]) >>>
+    0
+  let offset = 0
+  for (; offset + 8 <= bytes.length; offset += 8) {
+    crc = eight((crc ^ view.getUint32(offset, true)) >>> 0)
+    crc = eight((crc ^ view.getUint32(offset + 4, true)) >>> 0)
+  }
+  for (; offset < bytes.length; offset++) {
+    crc = ((crc >>> 8) ^ crcByteTable[(crc ^ bytes[offset]) & 0xff]) >>> 0
   }
   return crc >>> 0
-})
+}
 
 const readBytes = async (file: File, start: number, length: number) => {
   if (start < 0 || length < 0 || start + length > file.size) {
@@ -119,12 +166,24 @@ const readDirectory = async (file: File): Promise<{ entries: Entry[]; offset: nu
   }
   const entries: Entry[] = []
   const paths = new Set<string>()
+  // 中心目录通常只有几十 KB；一次读入可避免每个条目发起 2～3 次 File.slice().arrayBuffer()。
+  // 异常大的目录退回逐段读取，避免一次分配过多内存。
+  const directory =
+    size <= 16 * 1024 * 1024 ? await readBytes(file, offset, size) : null
+  const readDirectoryBytes = async (position: number, length: number) => {
+    if (position < 0 || length < 0 || position + length > size) {
+      invalid()
+    }
+    return directory
+      ? directory.subarray(position, position + length)
+      : readBytes(file, offset + position, length)
+  }
   let cursor = 0
   for (let index = 0; index < count; index++) {
     if (cursor + 46 > size) {
       invalid()
     }
-    const view = viewOf(await readBytes(file, offset + cursor, 46))
+    const view = viewOf(await readDirectoryBytes(cursor, 46))
     if (view.getUint32(0, true) !== 0x02014b50) {
       invalid()
     }
@@ -150,7 +209,7 @@ const readDirectory = async (file: File): Promise<{ entries: Entry[]; offset: nu
     ) {
       invalid()
     }
-    const name = await readBytes(file, offset + cursor + 46, nameLength)
+    const name = await readDirectoryBytes(cursor + 46, nameLength)
     const path = decodePath(name, flags)
     // 目录和同名文件也不能互相覆盖。
     const identity = path.endsWith('/') ? path.slice(0, -1) : path
@@ -158,7 +217,7 @@ const readDirectory = async (file: File): Promise<{ entries: Entry[]; offset: nu
       invalid()
     }
     paths.add(identity)
-    checkExtra(await readBytes(file, offset + cursor + 46 + nameLength, extraLength))
+    checkExtra(await readDirectoryBytes(cursor + 46 + nameLength, extraLength))
     entries.push({
       path,
       name,
@@ -256,9 +315,7 @@ export async function* readArchive(file: File): AsyncGenerator<ArchiveEntry> {
         if (written > entry.size) {
           invalid()
         }
-        for (const byte of chunk) {
-          crc = (crc >>> 8) ^ crcTable[(crc ^ byte) & 0xff]
-        }
+        crc = updateCrc(crc, chunk)
         if (chunk.length) {
           pending.push(chunk)
         }
@@ -300,11 +357,14 @@ export async function* readArchive(file: File): AsyncGenerator<ArchiveEntry> {
 
 /** 读出整个条目：会话 JSON 需要完整解析，图片需要识别类型后整张保存。 */
 export const readEntry = async (entry: ArchiveEntry): Promise<Blob> => {
-  const parts: Blob[] = []
+  // 一次性分配目标缓冲区，避免每个解压分片都创建一个 Blob（手机上开销很大）。
+  const bytes = new Uint8Array(entry.size)
+  let offset = 0
   for await (const chunk of entry.stream) {
-    parts.push(new Blob([chunk as Uint8Array<ArrayBuffer>]))
+    bytes.set(chunk as Uint8Array<ArrayBufferLike>, offset)
+    offset += chunk.length
   }
-  return new Blob(parts)
+  return new Blob([bytes as Uint8Array<ArrayBuffer>])
 }
 
 /** 不需要的条目也要读完，以校验大小与 CRC。 */
