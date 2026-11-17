@@ -24,6 +24,12 @@ export type InlineImage = { mediaType: string; data: string }
 export type ImageResolver = (fileId: string) => InlineImage | undefined
 
 /**
+ * 不支持联网工具的模型偶尔会把服务端注入的搜索提示原样输出。
+ * 展示层会替换成提示文案；请求层直接丢弃，避免它继续污染上下文。
+ */
+export const RAW_SEARCH_PROMPT = /<search_results>[\s\S]*?CITATION FORMAT[\s\S]*?<\/search_results>/gi
+
+/**
  * 文件按 Files API 的 file_id（附件的 serverId）引用：图片用 image 块，其余用 document 块。
  * 发送前 streamReply 会先补齐 serverId；仍为 null 的是本地没有原件的附件，不进入请求。
  * 传入 images 时不使用 Files API，图片改为内联 base64，文档附件不进入请求。
@@ -190,9 +196,12 @@ export const settleReply = (
   }
 }
 
-/** 回复里所有文本块拼起来，用于复制与判断是否有回答 */
+/** 回复里所有文本块拼起来，用于复制与判断是否有回答（已滤掉泄漏的搜索提示） */
 export const getReplyText = (reply: AssistantMessage) =>
-  reply.blocks.map((block) => (block.type === 'text' ? block.text : '')).join('')
+  reply.blocks
+    .map((block) => (block.type === 'text' ? block.text : ''))
+    .join('')
+    .replace(RAW_SEARCH_PROMPT, '')
 
 /**
  * 只有正常达到输出上限或被停止的回复可续写，报错回复不能续写。
@@ -279,13 +288,18 @@ const toAssistantParam = (
       continue
     }
     if (block.type === 'text') {
+      // 模型偶尔把服务端注入的搜索提示原样输出；不把它带回后续请求的上下文。
+      const cleaned = block.text.replace(RAW_SEARCH_PROMPT, '')
+      if (!cleaned) {
+        continue
+      }
       if (text) {
-        text.text += block.text
+        text.text += cleaned
       } else {
         const previous = content.at(-1)
         text = {
           type: 'text',
-          text: `${previous?.type === 'text' ? '\n\n' : ''}${block.text}`,
+          text: `${previous?.type === 'text' ? '\n\n' : ''}${cleaned}`,
         }
         content.push(text)
       }

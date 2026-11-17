@@ -132,7 +132,18 @@ const enqueueUpload = (
       }
       try {
         const body = file instanceof File ? file : new File([file], name, { type: file.type })
-        resolve((await uploadFile(apiKey, body, getUploadPurpose(name, isImage), signal)).id)
+        const purpose = getUploadPurpose(name, isImage)
+        try {
+          resolve((await uploadFile(apiKey, body, purpose, signal)).id)
+        } catch (error) {
+          // 版面解析会额外裁切文档里的图片，个别 docx/ppt 会因此解析失败；
+          // 自动退回纯文本解析，仍失败才把原始错误交给界面提示。
+          if (purpose === 'rich_layout_recognition' && getUploadErrorInfo(error)?.code === 'parseFailed') {
+            resolve((await uploadFile(apiKey, body, 'text_recognition', signal)).id)
+          } else {
+            throw error
+          }
+        }
       } catch (error) {
         reject(error)
       }
@@ -195,6 +206,10 @@ export const uploadAttachment = (
         if (notice) {
           for (const listener of noticeListeners) {
             listener(notice)
+          }
+        } else if (getUploadErrorInfo(error)?.code === 'parseFailed') {
+          for (const listener of noticeListeners) {
+            listener({ type: 'error', key: 'uploadParseFailedHint' })
           }
         }
       }

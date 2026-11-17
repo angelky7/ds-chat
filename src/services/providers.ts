@@ -459,22 +459,39 @@ const capabilitiesFor = (
         thinking: protocol === 'anthropic',
       }
 
+/**
+ * 官方只有 Flash 系列支持视觉、Files API、联网工具与服务端扩展字段。
+ * V4-Pro 是纯文本模型，给它传图片块或 server tools 会报「无法识别图片」，
+ * 甚至把服务端注入的 <search_results> 提示原样吐出来。
+ */
+const FLASH_MODELS = new Set([
+  'deepseek-flash',
+  'deepseek-v4-flash',
+  'deepseek-v4-flash-vision-exp',
+])
+
 /** 组装某个服务商的生效配置；model 缺省时用列表第一个 */
 export const resolveProvider = (id: ProviderId, model?: string): ActiveProvider => {
   const preset = findProvider(id)
   const config = configOf(id)
   const protocol = config.protocol || preset.protocol
   const models = effectiveModels(id)
+  const selectedModel = model?.trim() || models[0] || preset.model
+  const capabilities = capabilitiesFor(preset, protocol)
   return {
     preset,
     config,
     id,
     apiKey: config.apiKey.trim(),
     baseUrl: (config.baseUrl.trim() || preset.baseUrl).replace(/\/+$/, ''),
-    model: model?.trim() || models[0] || preset.model,
+    model: selectedModel,
     models,
     protocol,
-    capabilities: capabilitiesFor(preset, protocol),
+    // 同一个 DeepSeek 服务商下按模型降级：非 Flash 只保留文本对话与思考。
+    capabilities:
+      id === 'deepseek' && protocol === 'anthropic' && !FLASH_MODELS.has(selectedModel)
+        ? { ...capabilities, files: false, images: false, search: false, speech: false, serverTitle: false }
+        : capabilities,
   }
 }
 

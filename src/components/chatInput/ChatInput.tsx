@@ -85,15 +85,17 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
     if (incoming.length === 0 || useChatStore.getState().importingHistory || !ensureApiKey()) {
       return
     }
-    // 没有 Files API 的服务商只能内联图片，文档需要 DeepSeek 的服务端解析
-    const files = inline
-      ? incoming.filter((file) => isImage(resolveMimeType(file)))
-      : incoming
-    if (files.length < incoming.length) {
-      showToast({ key: 'providerImageOnly' })
-    }
+    // 按当前模型的能力筛选：没有 Files API 的服务商只能内联图片，
+    // 不支持视觉的纯文本模型（如 deepseek-v4-pro）连图片也一起跳过并提示。
+    const files = incoming.filter((file) =>
+      isImage(resolveMimeType(file)) ? provider.capabilities.images : provider.capabilities.files
+    )
     if (files.length === 0) {
+      showToast({ key: 'providerNoAttachments' })
       return
+    }
+    if (files.length < incoming.length) {
+      showToast({ key: inline ? 'providerImageOnly' : 'providerNoAttachments' })
     }
     void addDraftFiles(sessionId, files, activeApiKey(), inline).then((error) => {
       if (error) {

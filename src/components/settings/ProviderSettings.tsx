@@ -405,7 +405,8 @@ export const ProviderSettings = () => {
   const current = activeProvider()
   const [editingId, setEditingId] = useState<ProviderId>(current.id)
   const [creating, setCreating] = useState(false)
-  const provider = resolveProvider(editingId)
+  // 编辑当前服务商时带上正在使用的模型，能力列表才能反映 V4-Pro 这类纯文本模型的限制
+  const provider = resolveProvider(editingId, editingId === current.id ? current.model : undefined)
   const options = allProviders()
 
   return (

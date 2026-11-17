@@ -1128,11 +1128,14 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
         updateReply(sessionId, reply)
         persist(sessionId)
         const model = resolveModel(initial.model, provider)
+        // 非 Flash / 非 DeepSeek 模型没有 Files API；不支持视觉时连内联图片也不发。
         const images = provider.capabilities.files
           ? undefined
-          : await inlineImages(prepared, controller.signal, request.blobs)
-        // latest_reminder 是 DeepSeek 的扩展角色，其他服务商只接受 user / assistant
-        const supportsReminder = provider.id === 'deepseek'
+          : provider.capabilities.images
+            ? await inlineImages(prepared, controller.signal, request.blobs)
+            : () => undefined
+        // latest_reminder 是 DeepSeek Flash 的扩展角色，其他模型与服务商都不接受
+        const supportsReminder = provider.capabilities.files
         const messages = toRequestMessages(
           prepared.history,
           prepared.question,

@@ -6,6 +6,7 @@ import type {
   WebSearchResult,
   WebSearchToolResultBlock,
 } from '../api/types.js'
+import { RAW_SEARCH_PROMPT } from './reply.js'
 import type { AssistantMessage, ThinkingPart } from './types.js'
 
 /**
@@ -151,6 +152,10 @@ class SourceRegistry {
  * 文本块拼成一份 markdown：服务端在挂过引用的块之后另起新块，引用位置即块尾。
  * 引用之后的空白（含换行）仍留在被引用的块里，所以 [citation:N] 插在块尾空白之前。
  */
+/** 不支持联网工具的模型偶尔把服务端注入的搜索提示原样输出；这里只在展示层替换掉。 */
+const hideRawSearchPrompt = (value: string) =>
+  value.replace(RAW_SEARCH_PROMPT, () => ` ${translate('searchPromptLeaked')} `)
+
 const joinTextBlocks = (
   blocks: { text: string; citations?: TextCitation[] }[],
   registry: SourceRegistry
@@ -170,7 +175,8 @@ const joinTextBlocks = (
     }
     markdown += block.text.slice(body.length)
   }
-  return { markdown, text }
+  // 提示可能横跨多个流式文本块，因此在拼接完成后再过滤。
+  return { markdown: hideRawSearchPrompt(markdown), text: hideRawSearchPrompt(text) }
 }
 
 export const buildReplyView = (reply: AssistantMessage, streaming: boolean): ReplyView => {

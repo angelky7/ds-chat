@@ -246,10 +246,11 @@ export type MessageStreamEvent =
   | { type: 'ping' }
 
 /**
- * POST /anthropic/v1/files 的 purpose：PDF 与 Word、PPT 需要服务端做版面解析；
+ * POST /anthropic/v1/files 的 purpose：PDF 与 Word、PPT 需要服务端解析，
+ * rich_layout_recognition 额外裁图，失败时可退回纯文本的 text_recognition；
  * 纯文本、代码、表格与电子书不需要解析，用 user_data。
  */
-export type FilePurpose = 'rich_layout_recognition' | 'user_data'
+export type FilePurpose = 'rich_layout_recognition' | 'text_recognition' | 'user_data'
 
 /** POST /anthropic/v1/files 的响应 */
 export type FileObject = {
