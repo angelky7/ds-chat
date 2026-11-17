@@ -11,10 +11,18 @@ import {
   IconPaletteOutline16,
   IconPromptOutline16,
   IconServerOutline16,
+  IconThinkOutline16,
 } from '../base/icons.js'
 import { useTranslate, type TranslationKey } from '../../i18n/index.js'
 import { useEscapeLayer } from '../base/Modal.js'
-import { setLocale, setThemePreference, setTtsVoice, useSettings } from '../../services/settings.js'
+import { Switch } from '../base/Switch.js'
+import {
+  setKeepRefusedAnswer,
+  setLocale,
+  setThemePreference,
+  setTtsVoice,
+  useSettings,
+} from '../../services/settings.js'
 import { AppearanceSettings } from './AppearanceSettings.js'
 import { DataSettings } from './DataSettings.js'
 import { LocationSelects } from './LocationSetting.js'
@@ -67,6 +75,7 @@ const Row = ({
   label,
   value,
   indent,
+  trailing,
   onClick,
 }: {
   icon?: ReactNode
@@ -74,6 +83,8 @@ const Row = ({
   value?: string
   /** 没有图标时把文字缩进到与有图标的行对齐 */
   indent?: boolean
+  /** 右侧放开关之类的控件，此时不显示箭头 */
+  trailing?: ReactNode
   onClick?: () => void
 }) => {
   const content = (
@@ -81,11 +92,12 @@ const Row = ({
       {icon ? <span className={styles.icon}>{icon}</span> : null}
       <span className={styles.rowLabel}>{label}</span>
       {value ? <span className={styles.rowValue}>{value}</span> : null}
-      {onClick ? (
-        <span className={styles.chevron}>
-          <IconChevronRightOutline14 />
-        </span>
-      ) : null}
+      {trailing ??
+        (onClick ? (
+          <span className={styles.chevron}>
+            <IconChevronRightOutline14 />
+          </span>
+        ) : null)}
     </>
   )
   return onClick ? (
@@ -148,6 +160,7 @@ export const MobileSettings = () => {
   const locale = useSettings((state) => state.locale)
   const themePreference = useSettings((state) => state.themePreference)
   const ttsVoice = useSettings((state) => state.ttsVoice)
+  const keepRefusedAnswer = useSettings((state) => state.keepRefusedAnswer)
   const version = appVersion()
 
   const themeLabel =
@@ -199,7 +212,19 @@ export const MobileSettings = () => {
             label={t('settingDialogAsideProviderOptionLabel')}
             onClick={() => go('provider')}
           />
+          <Row
+            icon={<IconThinkOutline16 />}
+            label={t('settingsKeepRefused')}
+            trailing={
+              <Switch
+                checked={keepRefusedAnswer}
+                label={t('settingsKeepRefused')}
+                onChange={setKeepRefusedAnswer}
+              />
+            }
+          />
         </Group>
+        <div className={styles.groupHint}>{t('settingsKeepRefusedDescription')}</div>
         <Group title={t('settingsGroupVoice')}>
           <Row
             icon={<IconMicOutline16 />}

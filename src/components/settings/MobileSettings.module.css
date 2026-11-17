@@ -98,6 +98,13 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
+.groupHint {
+  margin: 8px 28px 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
 .card {
   margin: 0 16px;
   border-radius: 16px;

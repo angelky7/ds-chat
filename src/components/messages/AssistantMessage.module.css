@@ -106,6 +106,28 @@
   }
 }
 
+/* 被撤回但仍保留展示的正文：用次级色提示，不和错误提示抢注意力 */
+.refusalNotice {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-tertiary);
+
+  > svg {
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+}
+
 .bottom {
   position: relative;
   left: -6px;

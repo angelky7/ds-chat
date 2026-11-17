@@ -11,6 +11,7 @@ import {
   IconSettingsOutline16,
 } from '../base/icons.js'
 import {
+  setKeepRefusedAnswer,
   setLocale,
   setThemePreference,
   setTtsVoice,
@@ -21,6 +22,7 @@ import { useIsMobile } from '../../app/viewport.js'
 import { useTranslate, type TranslationKey } from '../../i18n/index.js'
 import { Modal } from '../base/Modal.js'
 import { Select } from '../base/Select.js'
+import { Switch } from '../base/Switch.js'
 import { AppearanceSettings } from './AppearanceSettings.js'
 import { DataSettings } from './DataSettings.js'
 import { LocationSetting } from './LocationSetting.js'
@@ -113,6 +115,7 @@ const SettingsContent = () => {
               <ThemeSetting />
               <LocaleSetting />
               <TtsVoiceSetting />
+              <KeepRefusedSetting />
               <LocationSetting />
             </>
           ) : section === 'prompts' ? (
@@ -223,5 +226,25 @@ const ThemeSetting = () => {
         ))}
       </div>
     </div>
+  )
+}
+
+/** 被撤回的回答是否保留展示：关闭时按协议丢弃，开启后保留并标注「已撤回」 */
+const KeepRefusedSetting = () => {
+  const t = useTranslate()
+  const keepRefusedAnswer = useSettings((state) => state.keepRefusedAnswer)
+  return (
+    <SettingCell
+      label={t('settingsKeepRefused')}
+      description={t('settingsKeepRefusedDescription')}
+      status={null}
+      action={
+        <Switch
+          checked={keepRefusedAnswer}
+          label={t('settingsKeepRefused')}
+          onChange={setKeepRefusedAnswer}
+        />
+      }
+    />
   )
 }

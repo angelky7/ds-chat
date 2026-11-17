@@ -187,7 +187,8 @@
   gap: 16px;
   margin-top: auto;
   padding: 12px 0 4px;
-  background-color: var(--dsw-alias-bg-base);
+  /* 与卡片同色，否则吸底时会在卡片上压出一条深色块 */
+  background-color: var(--dsw-alias-bg-layer-2);
 }
 
 .caps {
@@ -329,4 +330,9 @@
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+/* 同上：已挂载的 Key 胶囊也要用浅一层的表面，避免和卡片形成第三层 */
+:global(body[data-ds-dark-theme]) .saved {
+  background-color: var(--dsw-alias-bg-layer-3);
 }

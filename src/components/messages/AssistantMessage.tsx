@@ -56,10 +56,13 @@ export const AssistantMessage = memo(function AssistantMessage({
   const theme = useTheme()
   // 只有设置过 AI 气泡颜色时才套气泡，否则保持官方无气泡排版
   const bubble = useAppearance((state) => state.themes[theme].assistantBubble !== null)
-  const notice = streaming ? null : describeReply(message)
-  // 安全拒绝：已下发的思考与正文按协议丢弃，只显示模板答复。
+  // 安全拒绝：默认丢弃已下发的思考与正文，只显示模板答复；
+  // 打开「保留被撤回的回答」后内容还在，就不再显示模板，改成一句撤回说明。
   const refused = message.stopReason === 'refusal'
-  const answer = refused ? null : view.answer
+  const keptRefusal =
+    refused && message.blocks.some((block) => block.type === 'text' || block.type === 'thinking')
+  const notice = streaming || keptRefusal ? null : describeReply(message)
+  const answer = refused && !keptRefusal ? null : view.answer
   const responseText = [answer?.text, notice?.presentation === 'response' ? notice.text : null]
     .filter(Boolean)
     .join('\n\n')
@@ -71,7 +74,7 @@ export const AssistantMessage = memo(function AssistantMessage({
       {showAvatars ? <Avatar role="assistant" src={avatar} className={styles.avatar} /> : null}
       <div className={styles.body}>
         <div className={clsx(styles.content, bubble && styles.contentBubble)}>
-          {refused ? null : (
+          {refused && !keptRefusal ? null : (
             <ReplyArea
               message={message}
               view={view}
@@ -88,6 +91,12 @@ export const AssistantMessage = memo(function AssistantMessage({
               disableLink={false}
               sources={view.sources}
             />
+          ) : null}
+          {keptRefusal ? (
+            <div className={styles.refusalNotice}>
+              <IconWarningOutline16 />
+              <span>{t('replyRefusedKept')}</span>
+            </div>
           ) : null}
           {waiting ? (
             <div className={styles.waiting}>

@@ -76,6 +76,8 @@ export const en = {
   completionServerBusyToast: 'Server busy, please try again later.',
   unknownError: 'Unknown error',
   replyRefused: "Sorry, that's beyond my current scope. Let's talk about something else.",
+  replyRefusedKept:
+    'This answer was retracted. It stays visible here, but it is not included in the following context.',
   messageThinkDuration: 'Thought for {count} second',
   messageThinkDurationPlural: 'Thought for {count} seconds',
   messageThinkStopped: 'Stopped',
@@ -91,6 +93,9 @@ export const en = {
   backupInvalidFiles: 'The attachment data in this file is corrupted and cannot be imported.',
   settingsLocalePreference: 'Language',
   settingsTtsVoice: 'Read-aloud voice',
+  settingsKeepRefused: 'Keep retracted answers',
+  settingsKeepRefusedDescription:
+    'When the model refuses to answer, the text it already produced is normally removed. Turn this on to keep that text and mark it as retracted — it still will not be sent in later context.',
   settingsTtsVoiceStella: 'Stella (female)',
   settingsTtsVoiceTide: 'Tide (male)',
   settingsLocation: 'Location',

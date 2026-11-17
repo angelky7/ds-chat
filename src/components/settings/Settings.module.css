@@ -450,3 +450,9 @@
     max-width: 100%;
   }
 }
+
+/* 深色下 --dsw-specific-login-input 比卡片还深，像在卡片上挖了个洞，改用浅一层的表面 */
+:global(body[data-ds-dark-theme]) .apiKeySaved,
+:global(body[data-ds-dark-theme]) .apiKeyInput {
+  background-color: var(--dsw-alias-bg-layer-3);
+}

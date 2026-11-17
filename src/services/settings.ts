@@ -7,7 +7,7 @@ export type Locale = 'zh-CN' | 'en-US'
 /** 主题偏好；默认跟随系统 */
 export type ThemePreference = 'light' | 'dark' | 'system'
 
-/** 本机设置，存 localStorage：语言、主题、位置、朗读音色、深度思考与智能搜索开关、侧边栏收起状态 */
+/** 本机设置，存 localStorage：语言、主题、位置、朗读音色、深度思考与智能搜索开关、侧边栏收起状态、是否保留被撤回的回答 */
 type Settings = {
   locale: Locale
   themePreference: ThemePreference
@@ -16,6 +16,8 @@ type Settings = {
   thinking: boolean
   search: boolean
   siderCollapsed: boolean
+  /** 模型判定不能回答、撤回已输出内容时，是否仍把这些内容留在对话里展示 */
+  keepRefusedAnswer: boolean
 }
 
 const KEYS = {
@@ -26,6 +28,7 @@ const KEYS = {
   thinking: 'chat-demo:thinking',
   search: 'chat-demo:search',
   siderCollapsed: 'chat-demo:sider-collapsed',
+  keepRefusedAnswer: 'chat-demo:keep-refused-answer',
 } as const
 
 const read = (key: string) => {
@@ -93,6 +96,7 @@ export const useSettings = create<Settings>(() => ({
   thinking: read(KEYS.thinking) === 'true',
   search: read(KEYS.search) === 'true',
   siderCollapsed: read(KEYS.siderCollapsed) === 'true',
+  keepRefusedAnswer: read(KEYS.keepRefusedAnswer) === 'true',
 }))
 
 export const setLocale = (locale: Locale) => {
@@ -129,4 +133,9 @@ export const setSearch = (search: boolean) => {
 export const setSiderCollapsed = (siderCollapsed: boolean) => {
   write(KEYS.siderCollapsed, String(siderCollapsed))
   useSettings.setState({ siderCollapsed })
+}
+
+export const setKeepRefusedAnswer = (keepRefusedAnswer: boolean) => {
+  write(KEYS.keepRefusedAnswer, String(keepRefusedAnswer))
+  useSettings.setState({ keepRefusedAnswer })
 }

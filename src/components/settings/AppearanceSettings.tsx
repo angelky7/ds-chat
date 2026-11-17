@@ -13,6 +13,7 @@ import {
   type ThemeAppearance,
 } from '../../services/appearance.js'
 import { Avatar } from '../messages/Avatar.js'
+import { Switch } from '../base/Switch.js'
 import { Button } from '../base/Button.js'
 import { Modal } from '../base/Modal.js'
 import { Select } from '../base/Select.js'
@@ -115,27 +116,6 @@ export const AppearanceSettings = () => {
     </>
   )
 }
-
-const Switch = ({
-  checked,
-  label,
-  onChange,
-}: {
-  checked: boolean
-  label: string
-  onChange: (checked: boolean) => void
-}) => (
-  <button
-    type="button"
-    role="switch"
-    aria-checked={checked}
-    aria-label={label}
-    className={clsx(styles.switch, checked && styles.switchOn)}
-    onClick={() => onChange(!checked)}
-  >
-    <span className={styles.knob} />
-  </button>
-)
 
 /** 读取图片、压缩为 data URL 后交给调用方保存；失败时提示换一张 */
 const useImagePicker = (maxEdge: number, onPicked: (src: string) => void) => {

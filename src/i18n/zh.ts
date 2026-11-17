@@ -71,6 +71,7 @@ export const zh = {
   completionServerBusyToast: '服务器繁忙，请稍后再试',
   unknownError: '未知错误',
   replyRefused: '你好，这个问题我暂时无法回答，让我们换个话题再聊聊吧。',
+  replyRefusedKept: '这条回答已被撤回，只保留在这里展示，后续对话的上下文里不会包含它。',
   messageThinkDuration: '已思考（用时 {count} 秒）',
   messageThinkDurationPlural: '已思考（用时 {count} 秒）',
   messageThinkStopped: '已停止',
@@ -86,6 +87,9 @@ export const zh = {
   backupInvalidFiles: '文件中的附件数据已损坏，无法导入',
   settingsLocalePreference: '语言',
   settingsTtsVoice: '朗读音色',
+  settingsKeepRefused: '保留被撤回的回答',
+  settingsKeepRefusedDescription:
+    '模型判定不能回答时会撤回已经输出的内容。开启后这些内容会保留在对话里并标注「已撤回」，但它们仍然不会进入后续上下文。',
   settingsTtsVoiceStella: '海星（女声）',
   settingsTtsVoiceTide: '暗潮（男声）',
   settingsLocation: '位置信息',
