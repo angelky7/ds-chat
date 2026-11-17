@@ -133,6 +133,14 @@ const OptionPage = <T extends string>({
   </div>
 )
 
+/** 二级页对应的桌面分组：窗口变宽后弹窗能停在同一处 */
+const SECTION_OF: Partial<Record<Page, SettingsSection>> = {
+  appearance: 'appearance',
+  prompts: 'prompts',
+  provider: 'provider',
+  data: 'data',
+}
+
 /** 移动端设置：全屏分组列表，二级页沿用已有的设置组件 */
 export const MobileSettings = () => {
   const t = useTranslate()
@@ -149,9 +157,14 @@ export const MobileSettings = () => {
         ? t('avatarMenuSettingsDialogThemeSelectDarkOption')
         : t('avatarMenuSettingsDialogThemeSelectSystemOption')
 
+  /** 切页时同步给弹窗状态，窗口变宽后仍停在同一分组 */
+  const go = (next: Page) => {
+    useSettingsDialog.setState({ section: SECTION_OF[next] ?? 'general' })
+    setPage(next)
+  }
   const close = () => closeSettings()
   // Esc 先退回列表，再关掉整页；和弹窗一样只由最上层响应
-  useEscapeLayer(() => (page === 'root' ? close() : setPage('root')))
+  useEscapeLayer(() => (page === 'root' ? close() : go('root')))
 
   const body =
     page === 'root' ? (
@@ -161,30 +174,30 @@ export const MobileSettings = () => {
             icon={<IconGlobeLanguageOutline14 />}
             label={t('settingsLanguageRegion')}
             value={t(locale === 'zh-CN' ? 'settingsLocaleZhCN' : 'settingsLocaleEnUS')}
-            onClick={() => setPage('language')}
+            onClick={() => go('language')}
           />
           <Row
             icon={<IconLightOutline16 />}
             label={t('avatarMenuSettingsDialogThemeItemLabel')}
             value={themeLabel}
-            onClick={() => setPage('theme')}
+            onClick={() => go('theme')}
           />
           <Row
             icon={<IconPaletteOutline16 />}
             label={t('settingDialogAsideAppearanceOptionLabel')}
-            onClick={() => setPage('appearance')}
+            onClick={() => go('appearance')}
           />
         </Group>
         <Group title={t('settingsGroupChat')}>
           <Row
             icon={<IconPromptOutline16 />}
             label={t('settingDialogAsidePromptOptionLabel')}
-            onClick={() => setPage('prompts')}
+            onClick={() => go('prompts')}
           />
           <Row
             icon={<IconServerOutline16 />}
             label={t('settingDialogAsideProviderOptionLabel')}
-            onClick={() => setPage('provider')}
+            onClick={() => go('provider')}
           />
         </Group>
         <Group title={t('settingsGroupVoice')}>
@@ -192,14 +205,14 @@ export const MobileSettings = () => {
             icon={<IconMicOutline16 />}
             label={t('settingsTtsVoice')}
             value={t(ttsVoice === 'tide' ? 'settingsTtsVoiceTide' : 'settingsTtsVoiceStella')}
-            onClick={() => setPage('voice')}
+            onClick={() => go('voice')}
           />
         </Group>
         <Group title={t('settingsGroupData')}>
           <Row
             icon={<IconDataOutline16 />}
             label={t('settingDialogAsideDataOptionLabel')}
-            onClick={() => setPage('data')}
+            onClick={() => go('data')}
           />
         </Group>
         {version ? (
@@ -274,7 +287,7 @@ export const MobileSettings = () => {
             if (page === 'root') {
               close()
             } else {
-              setPage('root')
+              go('root')
             }
           }}
         >

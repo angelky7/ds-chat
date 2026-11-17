@@ -96,7 +96,11 @@ const SettingsContent = () => {
               role="tab"
               aria-selected={section === item.value}
               className={clsx(styles.navItem, section === item.value && styles.navItemActive)}
-              onClick={() => setSection(item.value)}
+              onClick={() => {
+                // 记到 store 里，窗口变窄切到整页设置时还停在同一分组
+                useSettingsDialog.setState({ section: item.value })
+                setSection(item.value)
+              }}
             >
               {item.icon}
               {t(item.label)}
