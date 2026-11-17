@@ -1,5 +1,6 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useTranslate } from '../../i18n/index.js'
+import { fetchBalance, formatBalance, supportsBalance, type BalanceInfo } from '../../services/api/balance.js'
 import { verifyApiKey } from '../../services/api/client.js'
 import { classifyApiError } from '../../services/api/errors.js'
 import {
@@ -19,7 +20,7 @@ import {
 } from '../../services/providers.js'
 import { Button } from '../base/Button.js'
 import { IconButton } from '../base/IconButton.js'
-import { IconEditOutline16 } from '../base/icons.js'
+import { IconEditOutline16, IconRefreshOutline16 } from '../base/icons.js'
 import { Select } from '../base/Select.js'
 import { showToast } from '../base/toastState.js'
 import styles from './Provider.module.css'
@@ -176,6 +177,101 @@ const KeyField = ({ provider }: { provider: ActiveProvider }) => {
           )}
         </div>
       ) : null}
+    </Field>
+  )
+}
+
+/** DeepSeek 官方充值页 */
+const TOP_UP_URL = 'https://platform.deepseek.com/top_up'
+
+/**
+ * 账户余额：读官方 /user/balance，展示总余额与赠额明细，右侧给充值入口。
+ * 没填 Key 时不显示；换 Key、改地址后自动重查，手动刷新会绕过一分钟缓存。
+ */
+const BalanceField = ({ provider }: { provider: ActiveProvider }) => {
+  const t = useTranslate()
+  const apiKey = provider.apiKey.trim()
+  const baseUrl = provider.config.baseUrl || provider.preset.baseUrl
+  const [balance, setBalance] = useState<BalanceInfo | null>(null)
+  const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
+  const [reloadKey, setReloadKey] = useState(0)
+
+  useEffect(() => {
+    if (!apiKey) {
+      setBalance(null)
+      setStatus('idle')
+      return
+    }
+    const controller = new AbortController()
+    setStatus('loading')
+    fetchBalance(
+      { apiKey, baseUrl },
+      { force: reloadKey > 0, signal: controller.signal }
+    )
+      .then((value) => {
+        setBalance(value)
+        setStatus('done')
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setStatus('error')
+        }
+      })
+    return () => controller.abort()
+  }, [apiKey, baseUrl, reloadKey])
+
+  if (!apiKey) {
+    return null
+  }
+
+  const detail = balance
+    ? [
+        balance.granted
+          ? t('balanceGranted', { amount: formatBalance(balance.granted, balance.currency) })
+          : '',
+        balance.toppedUp
+          ? t('balanceToppedUp', { amount: formatBalance(balance.toppedUp, balance.currency) })
+          : '',
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : ''
+
+  return (
+    <Field
+      label={t('balanceTitle')}
+      hint={t('balanceHint')}
+      action={
+        <div className={styles.headActions}>
+          <IconButton
+            icon={<IconRefreshOutline16 />}
+            tooltip={t('balanceRefresh')}
+            disabled={status === 'loading'}
+            onClick={() => setReloadKey((value) => value + 1)}
+          />
+          <a className={styles.topUp} href={TOP_UP_URL} target="_blank" rel="noreferrer">
+            {t('balanceTopUp')}
+          </a>
+        </div>
+      }
+    >
+      <div className={styles.balanceRow}>
+        {status === 'error' ? (
+          <span className={styles.balanceMuted}>{t('balanceLoadFailed')}</span>
+        ) : balance ? (
+          <>
+            <span className={styles.balanceAmount}>
+              {formatBalance(balance.total, balance.currency) || t('balanceEmpty')}
+            </span>
+            {detail ? <span className={styles.balanceDetail}>{detail}</span> : null}
+            {balance.available ? null : (
+              <span className={styles.balanceWarning}>{t('balanceInsufficient')}</span>
+            )}
+          </>
+        ) : (
+          <span className={styles.balanceMuted}>{t('balanceLoading')}</span>
+        )}
+      </div>
     </Field>
   )
 }
@@ -464,6 +560,9 @@ export const ProviderSettings = () => {
         <>
           <div className={styles.switchHint}>{t('providerSwitchHint')}</div>
           <KeyField key={`key-${editingId}`} provider={provider} />
+          {supportsBalance(provider) ? (
+            <BalanceField key={`balance-${editingId}`} provider={provider} />
+          ) : null}
           <ConnectionEditor key={`conn-${editingId}`} provider={provider} />
         </>
       )}
