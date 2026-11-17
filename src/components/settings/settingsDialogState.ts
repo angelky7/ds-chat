@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { activeApiKey } from '../../services/providers.js'
+import { closeMobileSider } from '../sider/mobileSiderState.js'
 
 /** 设置弹窗的分组：通用设置 / 提示词 / 模型服务 / 外观 / 数据管理 */
 export type SettingsSection = 'general' | 'prompts' | 'provider' | 'appearance' | 'data'
@@ -10,8 +11,11 @@ export const useSettingsDialog = create(() => ({
   section: 'general' as SettingsSection,
 }))
 
-export const openSettings = (section: SettingsSection) =>
+export const openSettings = (section: SettingsSection) => {
+  // 移动端设置是整页，先把抽屉收起来，关闭设置后回到对话而不是抽屉
+  closeMobileSider()
   useSettingsDialog.setState({ open: true, section })
+}
 
 export const closeSettings = () => useSettingsDialog.setState({ open: false })
 

@@ -142,8 +142,9 @@ export const App = () => {
           </div>
         </main>
         <SearchPanel />
+        {/* 移动端设置是全屏页面，放在 frame 内才能跟着可视视口收缩 */}
+        <SettingsDialog />
       </div>
-      <SettingsDialog />
       <Toast />
     </>
   )
