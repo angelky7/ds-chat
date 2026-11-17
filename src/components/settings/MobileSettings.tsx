@@ -6,6 +6,7 @@ import {
   IconCloseOutline16,
   IconDataOutline16,
   IconGlobeLanguageOutline14,
+  IconInfoOutline16,
   IconLightOutline16,
   IconMicOutline16,
   IconPaletteOutline16,
@@ -74,15 +75,12 @@ const Row = ({
   icon,
   label,
   value,
-  indent,
   trailing,
   onClick,
 }: {
-  icon?: ReactNode
+  icon: ReactNode
   label: string
   value?: string
-  /** 没有图标时把文字缩进到与有图标的行对齐 */
-  indent?: boolean
   /** 右侧放开关之类的控件，此时不显示箭头 */
   trailing?: ReactNode
   onClick?: () => void
@@ -101,17 +99,11 @@ const Row = ({
     </>
   )
   return onClick ? (
-    <button
-      type="button"
-      className={clsx(styles.row, !icon && styles.rowNoIcon, indent && styles.rowIndent)}
-      onClick={onClick}
-    >
+    <button type="button" className={styles.row} onClick={onClick}>
       {content}
     </button>
   ) : (
-    <div className={clsx(styles.row, !icon && styles.rowNoIcon, indent && styles.rowIndent)}>
-      {content}
-    </div>
+    <div className={styles.row}>{content}</div>
   )
 }
 
@@ -242,7 +234,11 @@ export const MobileSettings = () => {
         </Group>
         {version ? (
           <Group title={t('settingsGroupAbout')}>
-            <Row label={t('settingsVersion')} value={version} indent />
+            <Row
+              icon={<IconInfoOutline16 />}
+              label={t('settingsVersion')}
+              value={version}
+            />
           </Group>
         ) : null}
       </>

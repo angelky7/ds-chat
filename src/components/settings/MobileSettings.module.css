@@ -146,15 +146,6 @@
   background-color: var(--dsw-alias-border-l1);
 }
 
-.rowIndent {
-  padding-left: 48px;
-}
-
-.rowNoIcon + .row::before,
-.row + .rowNoIcon::before {
-  left: 16px;
-}
-
 .icon {
   display: flex;
   align-items: center;
