@@ -976,7 +976,8 @@ const prepareFiles = async (sessionId: string, request: Request, signal: AbortSi
   }
 
   const pending = new Map<string, FileAttachment>()
-  for (const [user] of getContextRounds(request.history).toReversed()) {
+  // 不用 toReversed：旧版 iOS Safari 没有这个方法，补传历史附件时会抛错。
+  for (const [user] of [...getContextRounds(request.history)].reverse()) {
     for (const file of user.files) {
       if (!file.serverId && !serverIds.has(file.id) && !pending.has(file.id)) {
         pending.set(file.id, file)

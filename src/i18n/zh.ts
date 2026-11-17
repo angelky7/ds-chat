@@ -257,6 +257,7 @@ export const zh = {
   historyImportFailed:
     '文件导入失败，可能是文件格式错误或使用了旧版的对话导出 ZIP 文件，请前往 DeepSeek 重新导出历史对话文件后再次导入。',
   historyImportFailedReason: '导入失败：{message}。请确认是 DeepSeek 导出的历史对话 ZIP 文件。',
+  historyImportOutdated: '导入失败：当前浏览器版本过低，请升级 iOS / Safari，或换用最新版 Chrome 后重试。',
   historyExportFailed: '导出失败：{message}',
   exportAllLabel: '导出所有历史对话',
   historyExportDescription:

@@ -46,15 +46,15 @@ const useHistoryImport = () => {
       const count = await importHistory(file)
       setStatus({ key: count === 1 ? 'historyImportedOne' : 'historyImported', params: { count } })
     } catch (error) {
-      // 展示具体原因（版本不符、ZIP 损坏、JSON 错误等），便于判断是文件问题还是浏览器问题。
+      const reason = error instanceof Error ? error.message : String(error)
+      // 旧浏览器缺少新内置方法时会抛英文 TypeError，别把它原样展示给用户。
+      const outdated = /is not a function|is not defined|undefined\)/i.test(reason)
       setStatus(
         error instanceof BackupError
           ? { key: 'historyImportFailedReason', reason: error.key, error: true }
-          : {
-              key: 'historyImportFailedReason',
-              params: { message: error instanceof Error ? error.message : String(error) },
-              error: true,
-            }
+          : outdated
+            ? { key: 'historyImportOutdated', error: true }
+            : { key: 'historyImportFailedReason', params: { message: reason }, error: true }
       )
     } finally {
       importing.current = false
