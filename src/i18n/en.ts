@@ -146,9 +146,10 @@ export const en = {
     'Compacted {rounds} rounds, but the summary is longer than the original text — nothing saved this time',
   settingsCompactClear: 'Restore original',
   settingsCompactCleared: 'Full history restored',
-  settingsCompactEmpty: 'Nothing to compact in this conversation yet',
+  settingsCompactEmpty: 'Nothing to compact in this conversation yet (at least 3 rounds required)',
   settingsCompactNoSession: 'Open a conversation first',
   settingsCompactFailed: 'Compaction failed: no summary was produced, context unchanged',
+  settingsCompactFailedReason: 'Compaction failed: {message} (context unchanged)',
   settingsTemperature: 'Model temperature',
   settingsTemperatureDescription:
     'Lower keeps answers steady and close to the source; higher is more varied. Fixed at 1.0 while deep thinking is on.',

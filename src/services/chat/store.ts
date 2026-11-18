@@ -1231,6 +1231,9 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
                 error instanceof CompactionError &&
                 (error.reason === 'nothing-to-compact' || error.reason === 'aborted')
               if (!silent) {
+                // 自动压缩失败在界面上只有一句提示，详细原因打到控制台便于排查
+                // eslint-disable-next-line no-console
+                console.warn('[auto-compact] failed:', error)
                 showToast({ key: 'settingsAutoCompactFailed' })
               }
               return null

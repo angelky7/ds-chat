@@ -137,9 +137,10 @@ export const zh = {
   settingsCompactTight: '已压缩 {rounds} 轮，但摘要比原文还长，这次没有省下 token',
   settingsCompactClear: '恢复原文',
   settingsCompactCleared: '已恢复完整历史',
-  settingsCompactEmpty: '当前对话还没有可压缩的内容',
+  settingsCompactEmpty: '当前对话还没有可压缩的内容（至少需要 3 轮对话）',
   settingsCompactNoSession: '先打开一个对话再压缩',
   settingsCompactFailed: '压缩失败：摘要没有生成，上下文保持原样',
+  settingsCompactFailedReason: '压缩失败：{message}（上下文保持原样）',
   settingsTemperature: '模型温度',
   settingsTemperatureDescription:
     '越低回答越稳、越贴近原文，越高越发散；开启深度思考时固定为 1.0，此项不生效。',

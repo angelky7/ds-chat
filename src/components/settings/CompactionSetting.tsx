@@ -74,7 +74,13 @@ export const CompactionSetting = () => {
         )
         return
       }
-      setStatus({ key: 'settingsCompactFailed', error: true })
+      // 上游的具体报错（超长、限流、模型不可用等）直接展示，便于定位服务商问题
+      const message = error instanceof Error ? error.message.trim().slice(0, 160) : ''
+      setStatus(
+        message
+          ? { key: 'settingsCompactFailedReason', params: { message }, error: true }
+          : { key: 'settingsCompactFailed', error: true }
+      )
     }
   }
 

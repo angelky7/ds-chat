@@ -244,7 +244,9 @@ export const compactConversation = async ({
     if (signal.aborted) {
       throw new CompactionError('aborted')
     }
-    throw error instanceof CompactionError ? error : new CompactionError('summarize-failed')
+    // 非 CompactionError 的原始错误（网络、协议、上游 4xx/5xx）直接抛出，
+    // 让界面能展示上游的具体原因，而不是笼统的「摘要没有生成」
+    throw error
   }
   if (signal.aborted) {
     throw new CompactionError('aborted')
