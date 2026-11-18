@@ -14,8 +14,11 @@ import type { AssistantMessage, Message, UserMessage } from './types.js'
  * 与上游不同的是原文始终留在本地，只影响发送内容，不删数据。
  */
 export const COMPACT_RETAIN_RATIO = 0.16
-/** 摘要请求的输出上限；超出说明摘要被截断，按失败处理 */
-const SUMMARY_MAX_TOKENS = 2048
+/**
+ * 摘要请求的输出上限，与对话请求一致；超出说明摘要被截断，按失败处理。
+ * 早期是 2048：几万 token 的历史压出的检查点很容易超限，整段作废导致「压缩失败」。
+ */
+const SUMMARY_MAX_TOKENS = 8192
 /** 至少要能覆盖两轮才值得压缩，否则省不下多少还会丢掉细节 */
 const MIN_COVERED_ROUNDS = 2
 /**
@@ -187,8 +190,15 @@ export type CompactionInput = {
 
 /** 压缩不可用的原因：没有可压缩区间 / 摘要失败。界面按 key 映射文案。 */
 export class CompactionError extends Error {
-  constructor(readonly reason: 'nothing-to-compact' | 'summarize-failed' | 'aborted') {
-    super(reason)
+  /**
+   * @param detail 失败细节：'truncated'（摘要超输出上限）/ 'empty'（摘要为空）；
+   * 缺省时 message 是 reason 本身，界面只显示笼统文案。
+   */
+  constructor(
+    readonly reason: 'nothing-to-compact' | 'summarize-failed' | 'aborted',
+    detail?: string
+  ) {
+    super(detail ?? reason)
     this.name = 'CompactionError'
   }
 }
@@ -240,8 +250,11 @@ const summarize = async (
     throw new CompactionError('aborted')
   }
   // 被输出上限截断的摘要会缺章节，宁可整段作废也不要写进上下文
-  if (stopReason === 'max_tokens' || !text.trim()) {
-    throw new CompactionError('summarize-failed')
+  if (stopReason === 'max_tokens') {
+    throw new CompactionError('summarize-failed', 'truncated')
+  }
+  if (!text.trim()) {
+    throw new CompactionError('summarize-failed', 'empty')
   }
   return text.trim()
 }

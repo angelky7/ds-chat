@@ -140,6 +140,7 @@ export const zh = {
   settingsCompactEmpty: '当前对话还没有可压缩的内容（至少需要 3 轮对话）',
   settingsCompactNoSession: '先打开一个对话再压缩',
   settingsCompactFailed: '压缩失败：摘要没有生成，上下文保持原样',
+  settingsCompactTruncated: '压缩失败：摘要超出输出上限被截断，上下文保持原样',
   settingsCompactFailedReason: '压缩失败：{message}（上下文保持原样）',
   settingsTemperature: '模型温度',
   settingsTemperatureDescription:

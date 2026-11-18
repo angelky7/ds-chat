@@ -149,6 +149,7 @@ export const en = {
   settingsCompactEmpty: 'Nothing to compact in this conversation yet (at least 3 rounds required)',
   settingsCompactNoSession: 'Open a conversation first',
   settingsCompactFailed: 'Compaction failed: no summary was produced, context unchanged',
+  settingsCompactTruncated: 'Compaction failed: the summary exceeded the output limit and was truncated; context unchanged',
   settingsCompactFailedReason: 'Compaction failed: {message} (context unchanged)',
   settingsTemperature: 'Model temperature',
   settingsTemperatureDescription:

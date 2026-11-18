@@ -70,7 +70,9 @@ export const CompactionSetting = () => {
             ? { key: 'settingsCompactEmpty' }
             : error.reason === 'aborted'
               ? null
-              : { key: 'settingsCompactFailed', error: true }
+              : error.message === 'truncated'
+                ? { key: 'settingsCompactTruncated', error: true }
+                : { key: 'settingsCompactFailed', error: true }
         )
         return
       }
