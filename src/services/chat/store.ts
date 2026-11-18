@@ -724,13 +724,15 @@ export const sendMessage = (targetSessionId: string | null) => {
     id: createId(),
     role: 'user',
     content: text,
-    files: files.map(({ id, serverId, name, size, isImage, mimeType }) => ({
+    // 内联文档的本地解析文字随附件一起保存，历史轮次按重发策略决定是否带上
+    files: files.map(({ id, serverId, name, size, isImage, mimeType, text }) => ({
       id,
       serverId,
       name,
       size,
       isImage,
       mimeType,
+      ...(text ? { text } : {}),
     })),
     createdAt: now,
   }
@@ -1267,7 +1269,6 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
             : () => undefined
         // latest_reminder 是 DeepSeek Flash 的扩展角色，其他模型与服务商都不接受
         const supportsReminder = provider.capabilities.files
-        // 附件重发只对支持 Files API 的服务商有意义，其余仍按内联图片的旧行为
         const { contextLimit, fileResend } = useSettings.getState()
         // 压缩可能刚在本次发送前完成，这里读最新值而不是起始快照
         const compaction = getSession(sessionId)?.compaction
@@ -1280,7 +1281,8 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
           images,
           {
             contextLimit,
-            fileResend: supportsReminder ? fileResend : 'once',
+            // 内联文档靠文本注入，every-turn 对第三方服务商同样生效
+            fileResend,
             ...(compaction
               ? { compaction: { summary: compaction.summary, coveredUntil: compaction.coveredUntil } }
               : {}),

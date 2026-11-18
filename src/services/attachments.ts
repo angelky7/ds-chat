@@ -167,6 +167,7 @@ const enqueueUpload = (
  */
 export type UploadTask =
   | { status: 'uploading' }
+  | { status: 'extracting' }
   | { status: 'done'; serverId: string }
   | { status: 'error'; error: TranslationMessage; retryable: boolean }
 

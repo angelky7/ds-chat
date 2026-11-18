@@ -23,6 +23,11 @@ export type FileAttachment = {
   isImage: boolean
   /** 具体 MIME；导入时没有原件或无法识别的为空字符串，不影响图片身份。 */
   mimeType: string
+  /**
+   * 本地解析出的文档文字：没有 Files API 的服务商用不了 file_id，
+   * 文档在浏览器里抽成文本随提问注入；历史轮次按重发策略决定是否带上。
+   */
+  text?: string
 }
 
 /** 本地消息的分支关系；字段缺省时按线性消息列表处理。 */

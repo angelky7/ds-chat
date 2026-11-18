@@ -22,7 +22,7 @@ export const FileCard = ({
 }: {
   name: string
   size: number
-  status?: 'uploading' | 'done' | 'error'
+  status?: 'uploading' | 'extracting' | 'done' | 'error'
   error?: string
   onRetry?: () => void
   onRemove?: () => void
@@ -35,6 +35,10 @@ export const FileCard = ({
   if (status === 'uploading') {
     icon = <span className={styles.spinner} />
     description = t('uploadFileStatusUploading')
+  } else if (status === 'extracting') {
+    // 内联文档在本地抽文字，没有上传动作但同样需要等待反馈
+    icon = <span className={styles.spinner} />
+    description = t('uploadFileStatusParsing')
   } else if (status === 'error') {
     // 不可重试（过大、格式不支持）时保留文件图标并显示原因
     if (onRetry) {

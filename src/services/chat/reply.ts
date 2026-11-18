@@ -32,27 +32,42 @@ export const RAW_SEARCH_PROMPT = /<search_results>[\s\S]*?CITATION FORMAT[\s\S]*
 /**
  * 文件按 Files API 的 file_id（附件的 serverId）引用：图片用 image 块，其余用 document 块。
  * 发送前 streamReply 会先补齐 serverId；仍为 null 的是本地没有原件的附件，不进入请求。
- * 传入 images 时不使用 Files API，图片改为内联 base64，文档附件不进入请求。
+ * 传入 images 时不使用 Files API：图片改为内联 base64，
+ * 带本地解析文字（text）的文档注入 <document> 文本块，其余附件不进入请求。
  */
 const toFileBlocks = (
   files: FileAttachment[],
   images?: ImageResolver
-): (FileBlockParam | Base64ImageBlockParam)[] =>
-  files.flatMap(({ id, serverId, isImage }): (FileBlockParam | Base64ImageBlockParam)[] => {
+): (FileBlockParam | Base64ImageBlockParam | TextBlockParam)[] =>
+  files.flatMap(({ id, serverId, isImage, name, text }): (
+    | FileBlockParam
+    | Base64ImageBlockParam
+    | TextBlockParam
+  )[] => {
     if (images) {
       const inline = isImage ? images(id) : undefined
-      return inline
-        ? [
-            {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: inline.mediaType,
-                data: inline.data,
-              },
+      if (inline) {
+        return [
+          {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: inline.mediaType,
+              data: inline.data,
             },
-          ]
-        : []
+          },
+        ]
+      }
+      if (!isImage && text?.trim()) {
+        // 文件名进标签属性，引号去掉避免破坏结构；正文原样注入
+        return [
+          {
+            type: 'text',
+            text: `<document name="${name.replace(/"/g, '')}">\n${text.trim()}\n</document>`,
+          },
+        ]
+      }
+      return []
     }
     return serverId
       ? [
@@ -351,8 +366,9 @@ export const getContextRounds = (history: Message[]): [UserMessage, AssistantMes
  * 历史轮次的附件策略：附件正文在每次请求里都会重新计入输入长度，
  * 同一份文档留在上下文里越久，越容易把整段对话顶出模型上限。
  * - once：文档一律不回传，图片保留最近一轮（追问画面细节仍需要原图）；
- * - every-turn：上下文窗口内的每一轮都按 file_id 重新带上文档与图片，
- *   代价是 token 随轮次线性增长，换来的是文件不会被"忘掉"。
+ * - every-turn：上下文窗口内的每一轮都重新带上文档与图片——Files 模式按 file_id，
+ *   内联模式带 <document> 文本与 base64 图片；代价是 token 随轮次线性增长，
+ *   换来的是文件不会被"忘掉"。
  */
 const HISTORIC_IMAGE_ROUNDS = 1
 
@@ -422,8 +438,8 @@ export const toRequestMessages = (
   if (limit > 0 && rounds.length > limit) {
     rounds = rounds.slice(-limit)
   }
-  // 内联图片模式（没有 Files API）用不到 every-turn，按 once 处理
-  const everyTurn = options.fileResend === 'every-turn' && !images
+  // every-turn 对两种模式都生效：内联文档是文本块、历史图片可从 IndexedDB 取原件
+  const everyTurn = options.fileResend === 'every-turn'
   rounds.forEach(([user, reply], index) => {
     const keepImages = index >= rounds.length - HISTORIC_IMAGE_ROUNDS
     const files = everyTurn ? user.files : keepImages ? user.files.filter((file) => file.isImage) : []

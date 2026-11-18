@@ -85,17 +85,17 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
     if (incoming.length === 0 || useChatStore.getState().importingHistory || !ensureApiKey()) {
       return
     }
-    // 按当前模型的能力筛选：没有 Files API 的服务商只能内联图片，
-    // 不支持视觉的纯文本模型（如 deepseek-v4-pro）连图片也一起跳过并提示。
+    // 图片按当前模型视觉能力筛选；文档一律放行——没有 Files API 的服务商会
+    // 在本地抽成文字随提问发送，解析失败时附件卡片上会显示原因。
     const files = incoming.filter((file) =>
-      isImage(resolveMimeType(file)) ? provider.capabilities.images : provider.capabilities.files
+      isImage(resolveMimeType(file)) ? provider.capabilities.images : true
     )
     if (files.length === 0) {
       showToast({ key: 'providerNoAttachments' })
       return
     }
     if (files.length < incoming.length) {
-      showToast({ key: inline ? 'providerImageOnly' : 'providerNoAttachments' })
+      showToast({ key: 'providerNoAttachments' })
     }
     void addDraftFiles(sessionId, files, activeApiKey(), inline).then((error) => {
       if (error) {
@@ -158,10 +158,6 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
       voice.status !== 'idle' ||
       !prepareDraftMessage(getDraft(sessionId), useUploads.getState().tasks, inline)
     ) {
-      // 当前服务商不支持文档附件时给出明确原因，避免按钮看起来没有反应
-      if (inline && attachments.some((item) => !item.isImage)) {
-        showToast({ key: 'providerImageOnly' })
-      }
       return
     }
     // 文本与上传完成态由提交动作读取最新快照，不使用上一次渲染的草稿。
@@ -285,7 +281,7 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
             type="file"
             multiple
             className={styles.fileInput}
-            accept={inline ? 'image/*' : ACCEPT}
+            accept={ACCEPT}
             onChange={(event) => {
               acceptFiles(Array.from(event.target.files ?? []))
               event.target.value = ''

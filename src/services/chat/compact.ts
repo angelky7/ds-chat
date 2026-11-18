@@ -49,7 +49,10 @@ const replyText = (reply: AssistantMessage): string =>
     .join('\n')
 
 const roundTokens = ([user, reply]: [UserMessage, AssistantMessage]): number =>
-  estimateTokens(user.content) + estimateTokens(replyText(reply)) + user.files.length * 64
+  estimateTokens(user.content) +
+  estimateTokens(replyText(reply)) +
+  // 内联文档带本地解析出的正文，按实际文字估算；其余附件按每个 64 token 粗计
+  user.files.reduce((sum, file) => sum + (file.text ? estimateTokens(file.text) : 64), 0)
 
 /** 一轮对话的估算用量，供界面展示当前上下文压力 */
 export const estimateContextTokens = (history: Message[]): number =>

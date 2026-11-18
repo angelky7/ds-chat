@@ -8,9 +8,11 @@ import {
   isImage,
   resolveMimeType,
   uploadAttachment,
+  useUploads,
   validateFiles,
   type UploadTask,
 } from '../attachments.js'
+import { extractDocumentText } from '../extract.js'
 import type { FileAttachment } from './types.js'
 
 export type DraftAttachment = {
@@ -21,6 +23,8 @@ export type DraftAttachment = {
   previewUrl: string | null
   /** 不经过 Files API 的附件：发送时直接内联，没有上传任务 */
   local?: boolean
+  /** 内联文档本地解析出的文字；解析完成后才有，发送时随提问注入 */
+  text?: string
 }
 
 type Draft = { text: string; attachments: DraftAttachment[] }
@@ -59,6 +63,48 @@ const upload = (attachment: DraftAttachment, apiKey: string) => {
     attachment.file.name,
     attachment.isImage
   ).catch(() => {})
+}
+
+/** 把解析出的文字写回草稿附件；同一附件 id 可能被重试覆盖多次 */
+const setAttachmentText = (sessionId: string | null, id: string, text: string) =>
+  useDrafts.setState((state) => {
+    const draft = state.drafts.get(sessionId)
+    if (!draft?.attachments.some((item) => item.id === id)) {
+      return state
+    }
+    const drafts = new Map(state.drafts)
+    drafts.set(sessionId, {
+      ...draft,
+      attachments: draft.attachments.map((item) => (item.id === id ? { ...item, text } : item)),
+    })
+    return { drafts }
+  })
+
+/**
+ * 内联文档的本地解析走上传任务的状态位：卡片显示「解析中」，失败可重试。
+ * 成功后清掉任务（卡片回到就绪态），文字保存在草稿附件上。
+ */
+const extract = (sessionId: string | null, attachment: DraftAttachment) => {
+  useUploads.setState((state) => ({
+    tasks: { ...state.tasks, [attachment.id]: { status: 'extracting' } },
+  }))
+  void extractDocumentText(attachment.file)
+    .then(({ text }) => {
+      setAttachmentText(sessionId, attachment.id, text)
+      useUploads.setState((state) => ({
+        tasks: Object.fromEntries(
+          Object.entries(state.tasks).filter(([key]) => key !== attachment.id)
+        ),
+      }))
+    })
+    .catch((error: TranslationMessage) => {
+      useUploads.setState((state) => ({
+        tasks: {
+          ...state.tasks,
+          [attachment.id]: { status: 'error', error, retryable: true },
+        },
+      }))
+    })
 }
 
 /** 整批校验通过后才创建预览和开始上传。 */
@@ -108,6 +154,11 @@ export const addDraftFiles = async (
     }))
     if (!local) {
       added.forEach((attachment) => upload(attachment, apiKey))
+    } else {
+      // 内联模式没有 Files API：文档在本地抽文字，图片直接就绪
+      added.filter((attachment) => !attachment.isImage).forEach((attachment) => {
+        extract(sessionId, attachment)
+      })
     }
   }
   return failed.length > 0
@@ -121,9 +172,17 @@ export const retryDraftAttachment = (
   apiKey: string
 ) => {
   const attachment = getDraft(sessionId).attachments.find((item) => item.id === attachmentId)
-  if (attachment && !attachment.local) {
-    upload(attachment, apiKey)
+  if (!attachment) {
+    return
   }
+  if (attachment.local) {
+    // 内联文档重试就是重新解析一次；解析失败多半是文件本身的问题
+    if (!attachment.isImage) {
+      extract(sessionId, attachment)
+    }
+    return
+  }
+  upload(attachment, apiKey)
 }
 
 /**
@@ -143,9 +202,22 @@ export const prepareDraftMessage = (
   for (const attachment of draft.attachments) {
     const mimeType = resolveMimeType(attachment.file)
     if (local) {
-      // 文档附件在第三方服务商下已被拦下，这里只放行图片
+      // 图片直接内联；文档必须在本地解析出文字后才能发送
       if (!attachment.isImage) {
-        return null
+        if (!attachment.text?.trim()) {
+          return null
+        }
+        files.push({
+          id: attachment.id,
+          serverId: '',
+          name: attachment.file.name,
+          size: attachment.file.size,
+          isImage: false,
+          mimeType,
+          text: attachment.text,
+          blob: attachment.file,
+        })
+        continue
       }
       files.push({
         id: attachment.id,
