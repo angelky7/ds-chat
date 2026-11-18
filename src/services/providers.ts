@@ -109,19 +109,6 @@ export const PROVIDERS: ProviderPreset[] = [
     corsBlocked: ['anthropic'],
   },
   {
-    id: 'glm',
-    label: 'GLM',
-    // 两个接口的预检都没有 Access-Control-Allow-Origin，纯静态页面无法直连，
-    // 需要在「接口地址」里填自建反向代理；保留官方地址便于反代转发。
-    protocol: 'openai',
-    baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
-    model: 'glm-4.6',
-    models: ['glm-4.6', 'glm-4.5', 'glm-4.5-air'],
-    capabilities: { ...chatOnlyCapabilities, thinking: false },
-    keysUrl: 'https://open.bigmodel.cn/usercenter/apikeys',
-    corsBlocked: ['anthropic', 'openai'],
-  },
-  {
     id: 'mimo',
     label: 'MiMo',
     // 预检返回 Access-Control-Allow-Origin: *，两种协议都可直连
@@ -144,22 +131,6 @@ export const PROVIDERS: ProviderPreset[] = [
     capabilities: { ...chatOnlyCapabilities, thinking: false },
     keysUrl: 'https://bailian.console.aliyun.com',
     corsBlocked: ['anthropic'],
-  },
-  {
-    id: 'volcengine',
-    label: '火山引擎',
-    // 方舟的 OpenAI 兼容入口；/api/v3/models 未开放，Key 校验按「无法校验」放行
-    protocol: 'openai',
-    baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
-    model: 'doubao-seed-2-1-pro-260915',
-    models: [
-      'doubao-seed-2-1-pro-260915',
-      'doubao-seed-2-1-turbo-260915',
-      'doubao-seed-1-6-250615',
-      'doubao-pro-32k',
-    ],
-    capabilities: { ...chatOnlyCapabilities, thinking: false },
-    keysUrl: 'https://ark.volcengine.com/region:cn-beijing/apikey',
   },
   {
     id: 'siliconflow',
