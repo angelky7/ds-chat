@@ -11,7 +11,7 @@ export const zh = {
   sessionSaveFailed: '对话或附件尚未保存到本机，关闭页面可能丢失，请重试',
   sessionDeleteFailed: '删除对话失败，请重试',
   settings: '设置',
-  appName: 'Deepsleep',
+  appName: 'DeepSleep',
   deleteSessionModalContentTitle: '永久删除对话',
   deleteSessionWithFilesDescription: '删除后，该对话及其中上传的文件将不可恢复。确认删除吗？',
   cancel: '取消',
@@ -93,6 +93,10 @@ export const zh = {
   settingsKeepRefused: '保留被撤回的回答',
   settingsKeepRefusedDescription:
     '模型判定不能回答时会撤回已经输出的内容。开启后这些内容会保留在对话里并标注「已撤回」，但它们仍然不会进入后续上下文。',
+  settingsTemperature: '模型温度',
+  settingsTemperatureDescription:
+    '越低回答越稳、越贴近原文，越高越发散；开启深度思考时固定为 1.0，此项不生效。',
+  settingsTemperatureReset: '恢复默认',
   settingsTtsVoiceStella: '海星（女声）',
   settingsTtsVoiceTide: '暗潮（男声）',
   settingsLocation: '位置信息',

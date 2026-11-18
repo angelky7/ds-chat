@@ -17,6 +17,7 @@ export type ChatCompletionRequest = {
   model: string
   messages: OpenAIMessage[]
   max_tokens?: number
+  temperature?: number
 }
 
 /** Anthropic 内容块 → OpenAI 文本片段；图片按 data URL 内联，其余块丢弃 */
@@ -74,7 +75,12 @@ export const toChatCompletion = (
       messages.push({ role: 'assistant', content: text })
     }
   }
-  return { model, messages, ...(body.max_tokens ? { max_tokens: body.max_tokens } : {}) }
+  return {
+    model,
+    messages,
+    ...(body.max_tokens ? { max_tokens: body.max_tokens } : {}),
+    ...(body.temperature !== undefined ? { temperature: body.temperature } : {}),
+  }
 }
 
 type ChunkPayload = {

@@ -1,6 +1,6 @@
 {
-  "name": "Deepsleep",
-  "short_name": "Deepsleep",
+  "name": "DeepSleep",
+  "short_name": "DeepSleep",
   "description": "静态聊天前端，支持多家模型服务商",
   "start_url": "./",
   "scope": "./",

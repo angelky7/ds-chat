@@ -31,6 +31,7 @@ import { MobileSettings } from './MobileSettings.js'
 import { PromptsSettings } from './PromptsSettings.js'
 import { ProviderSettings } from './ProviderSettings.js'
 import { SettingCell } from './SettingCell.js'
+import { TemperatureSlider } from './TemperatureSlider.js'
 import { closeSettings, useSettingsDialog, type SettingsSection } from './settingsDialogState.js'
 import styles from './Settings.module.css'
 
@@ -117,6 +118,7 @@ const SettingsContent = () => {
               <LocaleSetting />
               <TtsVoiceSetting />
               <KeepRefusedSetting />
+              <TemperatureSlider />
               <LocationSetting />
               <VersionSetting />
             </>

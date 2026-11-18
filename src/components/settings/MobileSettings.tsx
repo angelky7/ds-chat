@@ -12,6 +12,7 @@ import {
   IconPaletteOutline16,
   IconPromptOutline16,
   IconServerOutline16,
+  IconSettingsOutline16,
   IconThinkOutline16,
 } from '../base/icons.js'
 import { useTranslate, type TranslationKey } from '../../i18n/index.js'
@@ -30,11 +31,21 @@ import { DataSettings } from './DataSettings.js'
 import { LocationSelects } from './LocationSetting.js'
 import { PromptsSettings } from './PromptsSettings.js'
 import { ProviderSettings } from './ProviderSettings.js'
+import { TemperatureSlider } from './TemperatureSlider.js'
 import { closeSettings, useSettingsDialog, type SettingsSection } from './settingsDialogState.js'
 import styles from './MobileSettings.module.css'
 
 /** 移动端设置的页面：根列表 + 各个二级页 */
-type Page = 'root' | 'language' | 'theme' | 'appearance' | 'prompts' | 'provider' | 'voice' | 'data'
+type Page =
+  | 'root'
+  | 'language'
+  | 'theme'
+  | 'appearance'
+  | 'prompts'
+  | 'provider'
+  | 'temperature'
+  | 'voice'
+  | 'data'
 
 const TITLES: Record<Page, TranslationKey> = {
   root: 'settings',
@@ -43,6 +54,7 @@ const TITLES: Record<Page, TranslationKey> = {
   appearance: 'settingDialogAsideAppearanceOptionLabel',
   prompts: 'settingDialogAsidePromptOptionLabel',
   provider: 'settingDialogAsideProviderOptionLabel',
+  temperature: 'settingsTemperature',
   voice: 'settingsTtsVoice',
   data: 'settingDialogAsideDataOptionLabel',
 }
@@ -59,7 +71,6 @@ const initialPage = (section: SettingsSection): Page => {
       return 'root'
   }
 }
-
 const Group = ({ title, children }: { title: string; children: ReactNode }) => (
   <section className={styles.group}>
     <h2 className={styles.groupTitle}>{title}</h2>
@@ -152,6 +163,7 @@ export const MobileSettings = () => {
   const themePreference = useSettings((state) => state.themePreference)
   const ttsVoice = useSettings((state) => state.ttsVoice)
   const keepRefusedAnswer = useSettings((state) => state.keepRefusedAnswer)
+  const temperature = useSettings((state) => state.temperature)
   const version = appVersion()
 
   const themeLabel =
@@ -239,6 +251,12 @@ export const MobileSettings = () => {
             onClick={() => go('provider')}
           />
           <Row
+            icon={<IconSettingsOutline16 />}
+            label={t('settingsTemperature')}
+            value={temperature.toFixed(1)}
+            onClick={() => go('temperature')}
+          />
+          <Row
             icon={<IconThinkOutline16 />}
             label={t('settingsKeepRefused')}
             trailing={
@@ -324,6 +342,11 @@ export const MobileSettings = () => {
     ) : page === 'provider' ? (
       <div className={styles.padded}>
         <ProviderSettings />
+      </div>
+    ) : page === 'temperature' ? (
+      // 顶部标题已是「模型温度」，卡片里不再重复分组标题
+      <div className={styles.padded}>
+        <TemperatureSlider />
       </div>
     ) : (
       <div className={styles.padded}>

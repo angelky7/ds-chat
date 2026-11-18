@@ -186,6 +186,8 @@ export type CreateMessageRequest = {
   messages: MessageParam[]
   /** Anthropic 协议必填；DeepSeek 兼容接口可省略 */
   max_tokens?: number
+  /** 采样温度；DeepSeek 接受 0~2，思考模式下固定 1.0，默认值不发送 */
+  temperature?: number
   /** DeepSeek 接受 enabled / disabled，第三方网关只在不开启时省略 */
   thinking?: { type: 'enabled' | 'disabled' }
   /** 以下三项为 DeepSeek 扩展，其他服务商不发送 */

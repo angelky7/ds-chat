@@ -7,7 +7,7 @@ import type { ChatModel, CreateMessageRequest } from '../api/types.js'
 import { extractFileIds, getFileErrorCode, isRetryableApiError } from '../api/errors.js'
 import { cancelUpload, describeUploadError, uploadAttachment, useUploads } from '../attachments.js'
 import { translate } from '../../i18n/index.js'
-import { useSettings } from '../settings.js'
+import { DEFAULT_TEMPERATURE, useSettings } from '../settings.js'
 import {
   DEEPSEEK_DEFAULT_PROMPT,
   resolveActiveOpening,
@@ -1151,10 +1151,13 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
         const system = resolveActiveSystemPrompt(model)
         const trimmedSystem =
           provider.id === 'deepseek' || system.trim() !== DEEPSEEK_DEFAULT_PROMPT ? system : ''
+        // 默认温度不发送，交给服务端；思考模式下服务端本身固定 1.0
+        const temperature = useSettings.getState().temperature
         const body: CreateMessageRequest = {
           model,
           ...(trimmedSystem.trim() ? { system: trimmedSystem } : {}),
           messages,
+          ...(temperature === DEFAULT_TEMPERATURE ? {} : { temperature }),
           ...(provider.capabilities.files
             ? {
                 thinking: { type: initial.thinking ? 'enabled' : 'disabled' },

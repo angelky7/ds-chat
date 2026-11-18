@@ -14,7 +14,7 @@ export const en = {
     'Chats or attachments have not been saved locally. Retry before closing this page.',
   sessionDeleteFailed: 'Unable to delete this chat. Please try again.',
   settings: 'Settings',
-  appName: 'Deepsleep',
+  appName: 'DeepSleep',
   deleteSessionModalContentTitle: 'Delete chat?',
   deleteSessionWithFilesDescription:
     'This chat and its uploaded files will be permanently deleted and cannot be recovered. Delete this chat?',
@@ -101,6 +101,10 @@ export const en = {
   settingsKeepRefused: 'Keep retracted answers',
   settingsKeepRefusedDescription:
     'When the model refuses to answer, the text it already produced is normally removed. Turn this on to keep that text and mark it as retracted — it still will not be sent in later context.',
+  settingsTemperature: 'Model temperature',
+  settingsTemperatureDescription:
+    'Lower keeps answers steady and close to the source; higher is more varied. Fixed at 1.0 while deep thinking is on.',
+  settingsTemperatureReset: 'Reset',
   settingsTtsVoiceStella: 'Stella (female)',
   settingsTtsVoiceTide: 'Tide (male)',
   settingsLocation: 'Location',

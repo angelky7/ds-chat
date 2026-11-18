@@ -7,7 +7,7 @@ export type Locale = 'zh-CN' | 'en-US'
 /** 主题偏好；默认跟随系统 */
 export type ThemePreference = 'light' | 'dark' | 'system'
 
-/** 本机设置，存 localStorage：语言、主题、位置、朗读音色、深度思考与智能搜索开关、侧边栏收起状态、是否保留被撤回的回答 */
+/** 本机设置，存 localStorage：语言、主题、位置、朗读音色、深度思考与智能搜索开关、侧边栏收起状态、是否保留被撤回的回答、采样温度 */
 type Settings = {
   locale: Locale
   themePreference: ThemePreference
@@ -18,7 +18,14 @@ type Settings = {
   siderCollapsed: boolean
   /** 模型判定不能回答、撤回已输出内容时，是否仍把这些内容留在对话里展示 */
   keepRefusedAnswer: boolean
+  /** 采样温度 0~2，官方默认 1；只在非思考模式下生效，思考模式固定 1.0 */
+  temperature: number
 }
+
+/** 温度取值范围与默认值，与 DeepSeek 官方一致 */
+export const MIN_TEMPERATURE = 0
+export const MAX_TEMPERATURE = 2
+export const DEFAULT_TEMPERATURE = 1
 
 const KEYS = {
   locale: 'chat-demo:locale',
@@ -28,6 +35,7 @@ const KEYS = {
   thinking: 'chat-demo:thinking',
   search: 'chat-demo:search',
   siderCollapsed: 'chat-demo:sider-collapsed',
+  temperature: 'chat-demo:temperature',
   keepRefusedAnswer: 'chat-demo:keep-refused-answer',
 } as const
 
@@ -92,6 +100,18 @@ const initialThemePreference = (): ThemePreference => {
 /** 未保存过时使用服务端默认音色 stella（海星） */
 const initialTtsVoice = (): TtsVoice => (read(KEYS.ttsVoice) === 'tide' ? 'tide' : 'stella')
 
+/** 未保存过或存了非法值时回到默认温度 */
+const initialTemperature = (): number => {
+  const raw = read(KEYS.temperature)
+  if (raw === null || raw.trim() === '') {
+    return DEFAULT_TEMPERATURE
+  }
+  const value = Number(raw)
+  return Number.isFinite(value) && value >= MIN_TEMPERATURE && value <= MAX_TEMPERATURE
+    ? Math.round(value * 10) / 10
+    : DEFAULT_TEMPERATURE
+}
+
 export const useSettings = create<Settings>(() => ({
   locale: initialLocale(),
   location: initialLocation(),
@@ -101,6 +121,7 @@ export const useSettings = create<Settings>(() => ({
   search: read(KEYS.search) === 'true',
   siderCollapsed: read(KEYS.siderCollapsed) === 'true',
   keepRefusedAnswer: read(KEYS.keepRefusedAnswer) === 'true',
+  temperature: initialTemperature(),
 }))
 
 export const setLocale = (locale: Locale) => {
@@ -143,3 +164,15 @@ export const setKeepRefusedAnswer = (keepRefusedAnswer: boolean) => {
   write(KEYS.keepRefusedAnswer, String(keepRefusedAnswer))
   useSettings.setState({ keepRefusedAnswer })
 }
+
+/** 温度按 0.1 步进保存；越界时夹到合法区间 */
+export const setTemperature = (value: number) => {
+  const clamped = Math.min(
+    MAX_TEMPERATURE,
+    Math.max(MIN_TEMPERATURE, Math.round(value * 10) / 10)
+  )
+  write(KEYS.temperature, String(clamped))
+  useSettings.setState({ temperature: clamped })
+}
+
+export const resetTemperature = () => setTemperature(DEFAULT_TEMPERATURE)
