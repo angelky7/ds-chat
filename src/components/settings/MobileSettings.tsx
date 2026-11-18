@@ -28,9 +28,8 @@ import {
 } from '../../services/settings.js'
 import { AppearanceSettings } from './AppearanceSettings.js'
 import { CompactionSetting } from './CompactionSetting.js'
-import { ContextLimitSlider } from './ContextLimitSlider.js'
 import { DataSettings } from './DataSettings.js'
-import { FileResendSetting } from './FileResendSetting.js'
+import { FileModeSetting } from './FileModeSetting.js'
 import { LocationSelects } from './LocationSetting.js'
 import { PromptsSettings } from './PromptsSettings.js'
 import { ProviderSettings } from './ProviderSettings.js'
@@ -361,10 +360,7 @@ export const MobileSettings = () => {
     ) : page === 'context' ? (
       <>
         <div className={styles.padded}>
-          <ContextLimitSlider />
-        </div>
-        <div className={styles.padded}>
-          <FileResendSetting />
+          <FileModeSetting />
         </div>
         <div className={styles.padded}>
           <CompactionSetting />

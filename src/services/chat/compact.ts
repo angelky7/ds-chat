@@ -10,10 +10,9 @@ import type { AssistantMessage, Message, UserMessage } from './types.js'
  * 原文仍保留在会话里（只是不再发送），摘要生成失败时一律不落地，退回原有的轮次截断逻辑。
  *
  * 策略与提示词结构参考 DeepSeek Harness（MIT）的 packages/compaction/compaction-basic：
- * 达到窗口 80% 触发、保留最近 16% 原文、摘要在输出被截断时视为失败；
+ * 阈值可配（默认 80% 窗口）、保留最近 16% 原文、摘要在输出被截断时视为失败；
  * 与上游不同的是原文始终留在本地，只影响发送内容，不删数据。
  */
-export const COMPACT_THRESHOLD_RATIO = 0.8
 export const COMPACT_RETAIN_RATIO = 0.16
 /** 摘要请求的输出上限；超出说明摘要被截断，按失败处理 */
 const SUMMARY_MAX_TOKENS = 2048

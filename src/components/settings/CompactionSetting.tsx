@@ -1,10 +1,11 @@
+import clsx from 'clsx'
 import { useState } from 'react'
 import { useTranslate } from '../../i18n/index.js'
-import { CompactionError } from '../../services/chat/compact.js'
+import { getVisibleMessages } from '../../services/chat/branches.js'
+import { CompactionError, contextWindowOf, estimateContextTokens } from '../../services/chat/compact.js'
 import { clearCompaction, compactSession, useChatStore } from '../../services/chat/store.js'
-import { setAutoCompact, useSettings } from '../../services/settings.js'
+import { activeProvider } from '../../services/providers.js'
 import { Button } from '../base/Button.js'
-import { Switch } from '../base/Switch.js'
 import { SettingCell, type SettingStatus } from './SettingCell.js'
 import styles from './CompactionSetting.module.css'
 
@@ -17,7 +18,6 @@ const formatCount = (value: number) => value.toLocaleString()
  */
 export const CompactionSetting = () => {
   const t = useTranslate()
-  const autoCompact = useSettings((state) => state.autoCompact)
   const activeId = useChatStore((state) => state.activeId)
   const compaction = useChatStore((state) =>
     state.activeId ? state.sessionCache[state.activeId]?.compaction : undefined
@@ -25,6 +25,13 @@ export const CompactionSetting = () => {
   const busy = useChatStore((state) =>
     state.activeId ? Boolean(state.compacting[state.activeId]) : false
   )
+  // 估算当前上下文压力：只统计会进请求的轮次，附件按每个 64 token 粗计
+  const pressure = useChatStore((state) => {
+    const session = state.activeId ? state.sessionCache[state.activeId] : undefined
+    return session ? estimateContextTokens(getVisibleMessages(session)) : 0
+  })
+  const window = contextWindowOf(activeProvider().model)
+  const percent = window > 0 ? (pressure / window) * 100 : 0
   const [open, setOpen] = useState(false)
   const [status, setStatus] = useState<SettingStatus>(null)
 
@@ -67,18 +74,6 @@ export const CompactionSetting = () => {
   return (
     <>
       <SettingCell
-        label={t('settingsAutoCompact')}
-        description={t('settingsAutoCompactDescription')}
-        status={null}
-        action={
-          <Switch
-            checked={autoCompact}
-            label={t('settingsAutoCompact')}
-            onChange={setAutoCompact}
-          />
-        }
-      />
-      <SettingCell
         label={t('settingsCompactNow')}
         description={t('settingsCompactDescription')}
         status={
@@ -119,6 +114,14 @@ export const CompactionSetting = () => {
               {t('settingsCompactClear')}
             </Button>
           </div>
+        </div>
+      ) : null}
+      {pressure > 0 ? (
+        <div className={clsx(styles.pressure, percent >= 80 && styles.pressureHigh)}>
+          {t('settingsContextPressure', {
+            tokens: formatCount(pressure),
+            percent: percent.toFixed(1),
+          })}
         </div>
       ) : null}
     </>

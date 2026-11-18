@@ -102,9 +102,29 @@ export const zh = {
     '「每轮都重发」会让上下文窗口内的文档和图片一直带着，文件不会被遗忘，但 token 消耗会明显增加。',
   settingsFileResendOnce: '只在发送时一次',
   settingsFileResendEveryTurn: '每轮都重发',
+  settingsFileMode: '处理模式',
+  settingsFileModeFast: '快速',
+  settingsFileModeExpert: '专家',
+  settingsFileModeFastHint:
+    '只提取文字，最省额度，适合纯文字文档；需要读表格、图片或扫描件时切到专家。',
+  settingsFileModeExpertHint:
+    '版面解析并每轮重发附件，读得细、记得住，但 token 消耗明显更高。',
+  settingsFileModeCustomHint: '已自定义：{count} 项与预设不同。',
+  settingsAdvanced: '高级设置',
+  settingsAdvancedCustom: '已自定义 {count} 项',
+  settingsParseDepth: '文件解析',
+  settingsParseDepthText: '只提文字',
+  settingsParseDepthLayout: '版面解析',
+  settingsParseDepthDescription:
+    '只提文字更快更省，但读不出表格与图片里的内容；版面解析能保留结构和图片。',
+  settingsContextPressure: '当前上下文约 {tokens} tokens · 占窗口 {percent}%',
+  settingsCompactThreshold: '自动压缩阈值',
+  settingsCompactThresholdDescription:
+    '上下文占用达到模型窗口的这个比例时自动压缩。调低会更早把早期对话换成摘要，更省额度，但细节丢得更早。',
   settingsAutoCompact: '自动压缩上下文',
   settingsAutoCompactDescription:
-    '估算用量接近模型窗口上限（约 80%）时，先把较早的轮次压成摘要再发送。摘要失败不影响发送。',
+    '估算用量达到「自动压缩阈值」时，先把较早的轮次压成摘要再发送。摘要失败不影响发送。',
+  settingsAutoCompactDone: '已自动压缩 {rounds} 轮早期对话（约 {tokens} tokens）',
   settingsCompactNow: '上下文压缩',
   settingsCompactDescription:
     '把较早的轮次压成一张结构化检查点，后续只发摘要加最近若干轮；原文保留在本机，可随时恢复。',

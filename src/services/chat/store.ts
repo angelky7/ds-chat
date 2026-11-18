@@ -7,6 +7,7 @@ import type { ChatModel, CreateMessageRequest } from '../api/types.js'
 import { extractFileIds, getFileErrorCode, isRetryableApiError } from '../api/errors.js'
 import { cancelUpload, describeUploadError, uploadAttachment, useUploads } from '../attachments.js'
 import { translate } from '../../i18n/index.js'
+import { showToast } from '../../components/base/toastState.js'
 import { DEFAULT_TEMPERATURE, useSettings } from '../settings.js'
 import {
   DEEPSEEK_DEFAULT_PROMPT,
@@ -26,7 +27,6 @@ import {
 } from './drafts.js'
 import { createLatestReminder } from './latestReminder.js'
 import {
-  COMPACT_THRESHOLD_RATIO,
   compactConversation,
   contextWindowOf,
   estimateContextTokens,
@@ -1214,9 +1214,21 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
         // 压缩失败只记在控制台，继续按原有方式发送，绝不因压缩问题挡住消息。
         if (useSettings.getState().autoCompact) {
           const autoModel = resolveModel(initial.model, provider)
+          const { compactThreshold } = useSettings.getState()
           const pressure = estimateContextTokens(request.history)
-          if (pressure >= contextWindowOf(autoModel) * COMPACT_THRESHOLD_RATIO) {
-            await runCompaction(sessionId, request.history, controller.signal).catch(() => undefined)
+          if (pressure >= contextWindowOf(autoModel) * (compactThreshold / 100)) {
+            const done = await runCompaction(
+              sessionId,
+              request.history,
+              controller.signal
+            ).catch(() => null)
+            // 自动压缩静默发生，成功时提示一次；否则用户会以为早期消息凭空消失
+            if (done) {
+              showToast({
+                key: 'settingsAutoCompactDone',
+                params: { rounds: done.rounds, tokens: done.tokens.toLocaleString() },
+              })
+            }
           }
         }
         const prepared = provider.capabilities.files

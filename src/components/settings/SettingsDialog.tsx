@@ -26,9 +26,8 @@ import { Select } from '../base/Select.js'
 import { Switch } from '../base/Switch.js'
 import { AppearanceSettings } from './AppearanceSettings.js'
 import { CompactionSetting } from './CompactionSetting.js'
-import { ContextLimitSlider } from './ContextLimitSlider.js'
 import { DataSettings } from './DataSettings.js'
-import { FileResendSetting } from './FileResendSetting.js'
+import { FileModeSetting } from './FileModeSetting.js'
 import { LocationSetting } from './LocationSetting.js'
 import { MobileSettings } from './MobileSettings.js'
 import { PromptsSettings } from './PromptsSettings.js'
@@ -122,8 +121,7 @@ const SettingsContent = () => {
               <TtsVoiceSetting />
               <KeepRefusedSetting />
               <TemperatureSlider />
-              <ContextLimitSlider />
-              <FileResendSetting />
+              <FileModeSetting />
               <CompactionSetting />
               <LocationSetting />
               <VersionSetting />

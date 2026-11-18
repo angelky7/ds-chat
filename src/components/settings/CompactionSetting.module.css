@@ -41,3 +41,15 @@
   align-items: center;
   gap: 8px;
 }
+
+/* 上下文压力：估算值，用来直观回答「现在用了多少、离上限还有多远」 */
+.pressure {
+  padding: 2px 0 12px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.pressureHigh {
+  color: var(--dsw-alias-state-error-primary);
+}

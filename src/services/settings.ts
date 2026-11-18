@@ -13,6 +13,12 @@ export type Brand = 'deepseek' | 'deepsleep'
 /** 历史附件重发方式：once 只带一次（默认），every-turn 每轮都回传 */
 export type FileResend = 'once' | 'every-turn'
 
+/** 文件解析深度：text 只提取文字（快、省），layout 走版面解析（能读表格与图片） */
+export type ParseDepth = 'text' | 'layout'
+
+/** 处理模式：fast / expert 是预设，custom 表示细项被单独改过 */
+export type FileMode = 'fast' | 'expert' | 'custom'
+
 /** 本机设置，存 localStorage：语言、主题、品牌、位置、朗读音色、深度思考与智能搜索开关、侧边栏收起状态、是否保留被撤回的回答、采样温度、上下文轮次上限、附件重发方式 */
 type Settings = {
   locale: Locale
@@ -32,8 +38,12 @@ type Settings = {
   contextLimit: number
   /** 历史附件是否每轮重发；默认只在那一轮发一次 */
   fileResend: FileResend
-  /** 接近上下文窗口上限时自动把早期轮次压成摘要；默认关闭 */
+  /** 文件解析深度；快速模式只提文字，专家模式走版面解析 */
+  parseDepth: ParseDepth
+  /** 接近上下文窗口上限时自动把早期轮次压成摘要；默认开启 */
   autoCompact: boolean
+  /** 自动压缩的触发阈值，按窗口的百分比记（30~80）；整数存储避免浮点误差 */
+  compactThreshold: number
 }
 
 /** 温度取值范围与默认值，与 DeepSeek 官方一致 */
@@ -45,6 +55,51 @@ export const DEFAULT_TEMPERATURE = 1
 export const CONTEXT_LIMIT_UNLIMITED = 0
 export const MIN_CONTEXT_LIMIT = 1
 export const MAX_CONTEXT_LIMIT = 50
+
+/** 自动压缩阈值：按窗口百分比，整数存储 */
+export const MIN_COMPACT_THRESHOLD = 30
+export const MAX_COMPACT_THRESHOLD = 80
+export const DEFAULT_COMPACT_THRESHOLD = 80
+
+/**
+ * 处理模式预设：一次写入「高级」里的全部细项。
+ * 快速面向新手：只提文字、附件只发一次、阈值 80%（尽量不压）；
+ * 专家面向读文档：版面解析 + 每轮重发，阈值降到 50% 提前兜底。
+ * 两种模式的轮次上限都是无限，由压缩负责兜住累积。
+ */
+type FileModeValues = {
+  parseDepth: ParseDepth
+  fileResend: FileResend
+  autoCompact: boolean
+  compactThreshold: number
+  contextLimit: number
+}
+
+export const FILE_MODE_PRESETS: Record<'fast' | 'expert', FileModeValues> = {
+  fast: {
+    parseDepth: 'text',
+    fileResend: 'once',
+    autoCompact: true,
+    compactThreshold: DEFAULT_COMPACT_THRESHOLD,
+    contextLimit: CONTEXT_LIMIT_UNLIMITED,
+  },
+  expert: {
+    parseDepth: 'layout',
+    fileResend: 'every-turn',
+    autoCompact: true,
+    compactThreshold: 50,
+    contextLimit: CONTEXT_LIMIT_UNLIMITED,
+  },
+}
+
+/** 预设覆盖的字段，派生模式时逐个比对 */
+const FILE_MODE_FIELDS = [
+  'parseDepth',
+  'fileResend',
+  'autoCompact',
+  'compactThreshold',
+  'contextLimit',
+] as const
 
 const KEYS = {
   locale: 'chat-demo:locale',
@@ -58,7 +113,9 @@ const KEYS = {
   temperature: 'chat-demo:temperature',
   contextLimit: 'chat-demo:context-limit',
   fileResend: 'chat-demo:file-resend',
+  parseDepth: 'chat-demo:parse-depth',
   autoCompact: 'chat-demo:auto-compact',
+  compactThreshold: 'chat-demo:compact-threshold',
   keepRefusedAnswer: 'chat-demo:keep-refused-answer',
 } as const
 
@@ -154,6 +211,21 @@ const initialContextLimit = (): number => {
 const initialFileResend = (): FileResend =>
   read(KEYS.fileResend) === 'every-turn' ? 'every-turn' : 'once'
 
+/** 默认快速模式：只提取文字，最省额度 */
+const initialParseDepth = (): ParseDepth => (read(KEYS.parseDepth) === 'layout' ? 'layout' : 'text')
+
+/** 未保存过或越界时回到 80% */
+const initialCompactThreshold = (): number => {
+  const raw = read(KEYS.compactThreshold)
+  if (raw === null || raw.trim() === '') {
+    return DEFAULT_COMPACT_THRESHOLD
+  }
+  const value = Math.round(Number(raw))
+  return Number.isFinite(value) && value >= MIN_COMPACT_THRESHOLD && value <= MAX_COMPACT_THRESHOLD
+    ? value
+    : DEFAULT_COMPACT_THRESHOLD
+}
+
 export const useSettings = create<Settings>(() => ({
   locale: initialLocale(),
   location: initialLocation(),
@@ -167,7 +239,10 @@ export const useSettings = create<Settings>(() => ({
   temperature: initialTemperature(),
   contextLimit: initialContextLimit(),
   fileResend: initialFileResend(),
-  autoCompact: read(KEYS.autoCompact) === 'true',
+  parseDepth: initialParseDepth(),
+  // 默认开启：阈值 80% 时日常对话不会触发，只在极端会话里当兜底
+  autoCompact: read(KEYS.autoCompact) !== 'false',
+  compactThreshold: initialCompactThreshold(),
 }))
 
 export const setLocale = (locale: Locale) => {
@@ -250,3 +325,47 @@ export const setAutoCompact = (autoCompact: boolean) => {
   write(KEYS.autoCompact, String(autoCompact))
   useSettings.setState({ autoCompact })
 }
+
+export const setParseDepth = (parseDepth: ParseDepth) => {
+  write(KEYS.parseDepth, parseDepth)
+  useSettings.setState({ parseDepth })
+}
+
+/** 阈值按整数百分比保存；越界夹到 30~80 */
+export const setCompactThreshold = (value: number) => {
+  const clamped = Math.min(
+    MAX_COMPACT_THRESHOLD,
+    Math.max(MIN_COMPACT_THRESHOLD, Math.round(value))
+  )
+  write(KEYS.compactThreshold, String(clamped))
+  useSettings.setState({ compactThreshold: clamped })
+}
+
+/**
+ * 一次性把预设写进全部细项。模式本身不落盘，由细项反推，
+ * 这样就不会出现「显示专家、实际只发一次」这种两个数据源打架的情况。
+ */
+export const applyFileMode = (mode: 'fast' | 'expert') => {
+  const preset = FILE_MODE_PRESETS[mode]
+  write(KEYS.parseDepth, preset.parseDepth)
+  write(KEYS.fileResend, preset.fileResend)
+  write(KEYS.autoCompact, String(preset.autoCompact))
+  write(KEYS.compactThreshold, String(preset.compactThreshold))
+  write(KEYS.contextLimit, String(preset.contextLimit))
+  useSettings.setState(preset)
+}
+
+const diffFrom = (state: FileModeValues, preset: FileModeValues): number =>
+  FILE_MODE_FIELDS.reduce((count, field) => (state[field] === preset[field] ? count : count + 1), 0)
+
+/** 与某个预设完全一致就算该模式，否则为自定义 */
+export const activeFileMode = (state: FileModeValues): FileMode =>
+  diffFrom(state, FILE_MODE_PRESETS.fast) === 0
+    ? 'fast'
+    : diffFrom(state, FILE_MODE_PRESETS.expert) === 0
+      ? 'expert'
+      : 'custom'
+
+/** 自定义时与最近预设相差的项数，供「已自定义 N 项」提示 */
+export const fileModeChanged = (state: FileModeValues): number =>
+  Math.min(diffFrom(state, FILE_MODE_PRESETS.fast), diffFrom(state, FILE_MODE_PRESETS.expert))

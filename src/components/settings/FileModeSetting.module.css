@@ -1,0 +1,126 @@
+.mode {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 0;
+}
+
+.modeHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.modeLabel {
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--dsw-alias-label-primary);
+}
+
+/* 分段控件：外层做凹槽，选中项浮起，和整体边角风格一致 */
+.segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 9px;
+  background-color: var(--dsw-specific-selector);
+}
+
+/* 只让模式块里的分段控件贴左侧；设置行里的那份要跟文字垂直居中 */
+.mode > .segmented {
+  align-self: flex-start;
+}
+
+.segment {
+  padding: 4px 14px;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  line-height: 20px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+
+  &:hover {
+    color: var(--dsw-alias-label-primary);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--dsw-alias-brand-primary);
+    outline-offset: 1px;
+  }
+}
+
+.segmentActive {
+  background-color: var(--dsw-alias-bg-layer-3);
+  color: var(--dsw-alias-label-primary);
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+
+  &:hover {
+    color: var(--dsw-alias-label-primary);
+  }
+}
+
+.modeHint {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* 「高级设置」折行：整行可点，右侧箭头指示展开状态 */
+.advanced {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 0;
+  border: none;
+  background: none;
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  line-height: 22px;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 0 var(--dsw-alias-border-l2-darkmode-thin);
+
+  &:focus-visible {
+    outline: 2px solid var(--dsw-alias-brand-primary);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+}
+
+.advancedLabel {
+  flex: 1;
+  min-width: 0;
+}
+
+.advancedMeta {
+  flex: none;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.chevron {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin-right: 3px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  color: var(--dsw-alias-label-tertiary);
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+}
+
+.advancedOpen .chevron {
+  transform: rotate(225deg);
+}
+
+.panel {
+  padding-bottom: 4px;
+}

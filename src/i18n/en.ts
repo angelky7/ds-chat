@@ -110,9 +110,29 @@ export const en = {
     '"Every turn" keeps documents and images inside the context window attached on each request, so files are never forgotten — at the cost of noticeably more tokens.',
   settingsFileResendOnce: 'Once, when sent',
   settingsFileResendEveryTurn: 'Every turn',
+  settingsFileMode: 'Processing mode',
+  settingsFileModeFast: 'Fast',
+  settingsFileModeExpert: 'Expert',
+  settingsFileModeFastHint:
+    'Text only, cheapest. Switch to Expert to read tables, images or scans.',
+  settingsFileModeExpertHint:
+    'Layout parsing with attachments resent every turn — reads better and remembers more, at a clearly higher token cost.',
+  settingsFileModeCustomHint: 'Customized: {count} settings differ from the presets.',
+  settingsAdvanced: 'Advanced',
+  settingsAdvancedCustom: '{count} changed',
+  settingsParseDepth: 'File parsing',
+  settingsParseDepthText: 'Text only',
+  settingsParseDepthLayout: 'Layout',
+  settingsParseDepthDescription:
+    'Text-only is faster and cheaper but cannot read tables or text inside images; layout parsing keeps the structure and images.',
+  settingsContextPressure: 'About {tokens} tokens in context · {percent}% of the window',
+  settingsCompactThreshold: 'Auto-compact threshold',
+  settingsCompactThresholdDescription:
+    'Compact once the context fills this share of the model window. Lower it to replace older rounds with a summary sooner — cheaper, but details are lost earlier.',
   settingsAutoCompact: 'Auto-compact context',
   settingsAutoCompactDescription:
-    'When the estimated usage nears the model window (about 80%), older rounds are condensed into a summary before sending. A failed summary never blocks the message.',
+    'When the estimated usage reaches the auto-compact threshold, older rounds are condensed into a summary before sending. A failed summary never blocks the message.',
+  settingsAutoCompactDone: 'Auto-compacted {rounds} older rounds (about {tokens} tokens)',
   settingsCompactNow: 'Context compaction',
   settingsCompactDescription:
     'Condense older rounds into a structured checkpoint, then send that summary plus the most recent rounds. The original messages stay on this device and can be restored.',

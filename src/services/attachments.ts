@@ -3,6 +3,7 @@ import type { LinkedMessage, TranslationMessage } from '../i18n/index.js'
 import { uploadFile } from './api/client.js'
 import { classifyApiError, getUploadErrorInfo, isRetryableApiError } from './api/errors.js'
 import type { FilePurpose } from './api/types.js'
+import { useSettings, type ParseDepth } from './settings.js'
 import { ACCEPT_FILE_EXTS } from './uploadExts.js'
 
 /** 允许上传的扩展名，按扩展名白名单过滤，清单见 uploadExts.ts */
@@ -28,12 +29,20 @@ export const isAcceptedExt = (name: string) => ACCEPTED_EXTS.includes(getFileExt
 /** 需要服务端做版面解析的文档；其余非图片文件（纯文本、代码、表格、电子书）无需解析 */
 const LAYOUT_RECOGNITION_EXTS = new Set(['pdf', 'doc', 'docx', 'ppt', 'pptx'])
 
-/** 上传时的 purpose：图片不传，PDF 与 Word、PPT 做版面解析，其余按 user_data 上传 */
-export const getUploadPurpose = (name: string, isImage: boolean): FilePurpose | null => {
+/** 上传时的 purpose：图片不传，按解析深度决定文档是否做版面解析，其余按 user_data 上传 */
+export const getUploadPurpose = (
+  name: string,
+  isImage: boolean,
+  depth: ParseDepth = 'layout'
+): FilePurpose | null => {
   if (isImage) {
     return null
   }
-  return LAYOUT_RECOGNITION_EXTS.has(getFileExt(name)) ? 'rich_layout_recognition' : 'user_data'
+  if (!LAYOUT_RECOGNITION_EXTS.has(getFileExt(name))) {
+    return 'user_data'
+  }
+  // 快速模式只做文字识别：更快、更省，但读不出表格与图片里的内容
+  return depth === 'text' ? 'text_recognition' : 'rich_layout_recognition'
 }
 
 /** 文件允许的最大体积（MB），按上传时的 purpose 区分 */
@@ -132,7 +141,7 @@ const enqueueUpload = (
       }
       try {
         const body = file instanceof File ? file : new File([file], name, { type: file.type })
-        const purpose = getUploadPurpose(name, isImage)
+        const purpose = getUploadPurpose(name, isImage, useSettings.getState().parseDepth)
         try {
           resolve((await uploadFile(apiKey, body, purpose, signal)).id)
         } catch (error) {
