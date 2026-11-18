@@ -203,6 +203,9 @@ export class CompactionError extends Error {
   }
 }
 
+/** 重试时给推理模型更多输出余量（思考会占用输出预算）；Anthropic 侧保持 8192 */
+const RETRY_MAX_TOKENS = 16384
+
 /** 跑一次摘要请求并校验结果；截断或空摘要都视为失败，绝不写入半截检查点 */
 const summarize = async (
   replay: MessageParam[],
@@ -212,14 +215,15 @@ const summarize = async (
     model,
     system,
     signal,
-  }: Pick<CompactionInput, 'provider' | 'model' | 'system' | 'signal'>
+  }: Pick<CompactionInput, 'provider' | 'model' | 'system' | 'signal'>,
+  maxTokens: number
 ): Promise<string> => {
   const messages: MessageParam[] = [...replay, { role: 'user', content: instruction }]
   const body: CreateMessageRequest = {
     model,
     ...(system.trim() ? { system } : {}),
     messages,
-    max_tokens: SUMMARY_MAX_TOKENS,
+    max_tokens: maxTokens,
     // 摘要不需要思考：既省 token，也避免思考占满输出上限导致检查点被截断
     ...(provider.capabilities.files ? { thinking: { type: 'disabled' as const } } : {}),
   }
@@ -275,6 +279,32 @@ const mergeInstruction = (previous: string | undefined): string =>
     : COMPACTION_INSTRUCTION
 
 /**
+ * 递归压缩一组轮次：摘要被截断或为空（推理模型把输出预算烧在思考上）时，
+ * 对半拆开分别压缩再合并——输入越短、推理越短，总能收敛到能放下的大小。
+ * 拆到单轮仍失败就放弃，把原始错误交给界面。
+ */
+const summarizeRounds = async (
+  rounds: CompactionRound[],
+  previous: string,
+  ctx: Pick<CompactionInput, 'provider' | 'model' | 'system' | 'signal'>,
+  maxTokens: number = SUMMARY_MAX_TOKENS
+): Promise<string> => {
+  try {
+    return await summarize(toCompactionReplay(rounds), mergeInstruction(previous), ctx, maxTokens)
+  } catch (error) {
+    const retryable =
+      error instanceof CompactionError && (error.message === 'truncated' || error.message === 'empty')
+    if (!retryable || rounds.length <= 1) {
+      throw error
+    }
+    const retryMax = ctx.provider.protocol === 'openai' ? RETRY_MAX_TOKENS : maxTokens
+    const mid = Math.floor(rounds.length / 2)
+    const first = await summarizeRounds(rounds.slice(0, mid), previous, ctx, retryMax)
+    return await summarizeRounds(rounds.slice(mid), first, ctx, retryMax)
+  }
+}
+
+/**
  * 执行一次压缩：选区间 → 把被覆盖轮次按窗口预算切成若干片 → 逐片重放并请求摘要，
  * 前一片的摘要并进后一片的指令里，最终合并成一份完整检查点。
  * 单片能装下时与原来的行为一致；导入的超长会话（重放超窗口）也能压出来。
@@ -314,8 +344,7 @@ export const compactConversation = async ({
 
   let summary = previous?.summary.trim() || ''
   for (const chunk of chunks) {
-    const replay = toCompactionReplay(chunk)
-    summary = await summarize(replay, mergeInstruction(summary), { provider, model, system, signal })
+    summary = await summarizeRounds(chunk, summary, { provider, model, system, signal })
   }
 
   return {
