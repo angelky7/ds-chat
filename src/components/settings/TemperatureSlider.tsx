@@ -11,6 +11,9 @@ import {
 import { MduiSlider } from '../base/MduiSlider.js'
 import styles from './SliderField.module.css'
 
+/** 气泡固定一位小数，和标题右侧的数值保持一致 */
+const formatTemperature = (value: number) => value.toFixed(1)
+
 /**
  * 采样温度滑块：0~2，默认 1。
  * 只在非思考模式下生效——思考模式服务端固定 1.0，提示文案里已说明，避免用户以为调了没用。
@@ -30,6 +33,7 @@ export const TemperatureSlider = ({ className }: { className?: string }) => {
         max={MAX_TEMPERATURE}
         step={0.1}
         label={t('settingsTemperature')}
+        formatValue={formatTemperature}
         onChange={setTemperature}
       />
       <div className={styles.foot}>

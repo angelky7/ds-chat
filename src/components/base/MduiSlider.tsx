@@ -3,7 +3,17 @@ import 'mdui/components/slider/index.js'
 import 'mdui/mdui.css'
 import styles from './MduiSlider.module.css'
 
-type MduiSliderElement = HTMLElement & { value: number }
+type MduiSliderElement = HTMLElement & {
+  value: number
+  /** mdui 自带的提示文本格式化钩子，只能通过 property 设置 */
+  labelFormatter: (value: number) => string
+}
+
+/**
+ * 原生 range 按 step 累加会带出二进制误差（0.1 × 14 = 1.4000000000000001），
+ * 显示前统一收敛到 4 位小数再去掉末尾的 0。
+ */
+const trimFloat = (value: number): string => String(Number(value.toFixed(4)))
 
 /**
  * mdui 的滑块是 Web Component：属性走 attribute，事件只能 addEventListener。
@@ -17,6 +27,7 @@ export const MduiSlider = ({
   step,
   label,
   disabled = false,
+  formatValue,
   onChange,
 }: {
   value: number
@@ -26,11 +37,15 @@ export const MduiSlider = ({
   /** 无障碍名称；mdui 不自带可见标签 */
   label: string
   disabled?: boolean
+  /** 拖动时气泡里的文本；默认收敛浮点误差 */
+  formatValue?: (value: number) => string
   onChange: (value: number) => void
 }) => {
   const hostRef = useRef<HTMLDivElement>(null)
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
+  const formatRef = useRef(formatValue)
+  formatRef.current = formatValue
 
   useEffect(() => {
     const element = hostRef.current?.querySelector<MduiSliderElement>('mdui-slider')
@@ -39,6 +54,9 @@ export const MduiSlider = ({
     }
     const handleInput = () => onChangeRef.current(element.value)
     element.addEventListener('input', handleInput)
+    // 组件内部的 value 由 position 反算，会重新变成 1.4000000000000001，
+    // 所以只能改它用来显示的函数，不能在外部把 value 写干净。
+    element.labelFormatter = (current) => (formatRef.current ?? trimFloat)(current)
     return () => element.removeEventListener('input', handleInput)
   }, [])
 
