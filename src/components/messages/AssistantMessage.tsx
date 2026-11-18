@@ -7,7 +7,7 @@ import { useAppearance } from '../../services/appearance.js'
 import { useActiveProvider } from '../../services/providers.js'
 import { describeReply } from '../../services/chat/describe.js'
 import { canContinueReply } from '../../services/chat/reply.js'
-import { continueReply, regenerateReply } from '../../services/chat/store.js'
+import { continueReply, regenerateReply, useChatStore } from '../../services/chat/store.js'
 import { stopReadAloud } from '../../services/speech/readAloud.js'
 import type { AssistantMessage as AssistantMessageType } from '../../services/chat/types.js'
 import { openSettings } from '../settings/settingsDialogState.js'
@@ -68,6 +68,9 @@ export const AssistantMessage = memo(function AssistantMessage({
     .join('\n\n')
   const copyText = responseText || notice?.text
   const waiting = streaming && view.steps.length === 0 && !view.answer && !message.thinking
+  // 自动压缩发生在请求之前：此时还没有任何输出，用一句明确的文案代替「思考中的三个点」，
+  // 否则重放几十万 token 的这段时间看起来就是卡住了
+  const compacting = useChatStore((state) => Boolean(state.compacting[sessionId]))
   const summaryEntry = `${message.id}-summary`
   return (
     <div className={styles.message}>
@@ -98,11 +101,16 @@ export const AssistantMessage = memo(function AssistantMessage({
               <span>{t('replyRefusedKept')}</span>
             </div>
           ) : null}
-          {waiting ? (
+          {waiting && !compacting ? (
             <div className={styles.waiting}>
               {[0, 1, 2].map((index) => (
                 <span key={index} className={styles.waitingDot} />
               ))}
+            </div>
+          ) : null}
+          {compacting && streaming ? (
+            <div className={styles.waiting}>
+              <span className={styles.compacting}>{t('chatCompacting')}</span>
             </div>
           ) : null}
           {notice?.presentation === 'response' ? (

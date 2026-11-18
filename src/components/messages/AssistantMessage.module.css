@@ -184,3 +184,10 @@
     --search-row-site-logo-color: var(--dsw-alias-interactive-bg-hover);
   }
 }
+
+/* 压缩提示：与等待动画同一行高，换文案而不是换布局 */
+.compacting {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 13px;
+  line-height: 20px;
+}

@@ -27,6 +27,7 @@ import {
 } from './drafts.js'
 import { createLatestReminder } from './latestReminder.js'
 import {
+  CompactionError,
   compactConversation,
   contextWindowOf,
   estimateContextTokens,
@@ -1221,7 +1222,16 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
               sessionId,
               request.history,
               controller.signal
-            ).catch(() => null)
+            ).catch((error: unknown) => {
+              // 没有可压内容或用户中断都不必打扰；只有摘要真的失败才提示
+              const silent =
+                error instanceof CompactionError &&
+                (error.reason === 'nothing-to-compact' || error.reason === 'aborted')
+              if (!silent) {
+                showToast({ key: 'settingsAutoCompactFailed' })
+              }
+              return null
+            })
             // 自动压缩静默发生，成功时提示一次；否则用户会以为早期消息凭空消失
             if (done) {
               showToast({

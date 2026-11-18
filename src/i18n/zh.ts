@@ -124,6 +124,8 @@ export const zh = {
   settingsAutoCompact: '自动压缩上下文',
   settingsAutoCompactDescription:
     '估算用量达到「自动压缩阈值」时，先把较早的轮次压成摘要再发送。摘要失败不影响发送。',
+  chatCompacting: '正在压缩早期上下文，为你节省 token…',
+  settingsAutoCompactFailed: '上下文压缩未完成，建议手动压缩',
   settingsAutoCompactDone: '已自动压缩 {rounds} 轮早期对话（约 {tokens} tokens）',
   settingsCompactNow: '上下文压缩',
   settingsCompactDescription:
