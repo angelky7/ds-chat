@@ -491,14 +491,17 @@ export const toRequestMessages = (
   return messages
 }
 
+/** 会进入请求的一轮问答；压缩分片与上下文估算都以它为单位 */
+export type CompactionRound = [UserMessage, AssistantMessage]
+
 /**
- * 压缩时重放被覆盖的区间：只带文字，不带附件正文。
+ * 压缩时重放指定区间：只带文字，不带附件正文。
  * 摘要要保住的是结论、决策和未决问题，把这些轮次的文档正文重新读一遍既贵，
  * 也容易让摘要请求本身超限——附件被略过的轮次补占位说明，避免模型以为还有原文。
  */
-export const toCompactionReplay = (history: Message[], coveredUntil: string): MessageParam[] => {
+export const toCompactionReplay = (rounds: CompactionRound[]): MessageParam[] => {
   const messages: MessageParam[] = []
-  for (const [user, reply] of getContextRounds(history)) {
+  for (const [user, reply] of rounds) {
     if (!user.content && user.files.length === 0) {
       continue
     }
@@ -507,9 +510,6 @@ export const toCompactionReplay = (history: Message[], coveredUntil: string): Me
       content: user.content || OMITTED_ATTACHMENTS,
     })
     messages.push(toAssistantParam(reply))
-    if (user.id === coveredUntil) {
-      break
-    }
   }
   return messages
 }

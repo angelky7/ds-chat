@@ -2,7 +2,7 @@ import { streamMessage } from '../api/client.js'
 import { streamChatCompletion, toChatCompletion } from '../api/openai.js'
 import type { CreateMessageRequest, MessageParam } from '../api/types.js'
 import type { ActiveProvider } from '../providers.js'
-import { getContextRounds, toCompactionReplay } from './reply.js'
+import { getContextRounds, toCompactionReplay, type CompactionRound } from './reply.js'
 import type { AssistantMessage, Message, UserMessage } from './types.js'
 
 /**
@@ -18,6 +18,12 @@ export const COMPACT_RETAIN_RATIO = 0.16
 const SUMMARY_MAX_TOKENS = 2048
 /** 至少要能覆盖两轮才值得压缩，否则省不下多少还会丢掉细节 */
 const MIN_COVERED_ROUNDS = 2
+/**
+ * 单次摘要请求的重放预算（占窗口比例）：导入的超长会话可能比窗口还大，
+ * 整段重放必然被上游拒绝。超过预算时把被压缩区间切成多次摘要调用，
+ * 前一段的摘要并进下一段的指令里逐段合并，最终仍是一份完整检查点。
+ */
+const REPLAY_BUDGET_RATIO = 0.5
 
 /** 模型上下文窗口；未知模型按 200k 保守处理，宁可早压也不要把请求顶爆 */
 const CONTEXT_WINDOWS: Record<string, number> = {
@@ -72,6 +78,8 @@ export type CompactionPlan = {
   rounds: number
   /** 被覆盖轮次的估算 token */
   tokens: number
+  /** 被覆盖的轮次内容，供分片重放 */
+  covered: CompactionRound[]
 }
 
 /**
@@ -108,6 +116,7 @@ export const selectCompactionPlan = (
     coveredUntil: covered[covered.length - 1][0].id,
     rounds: covered.length,
     tokens: covered.reduce((sum, round) => sum + roundTokens(round), 0),
+    covered,
   }
 }
 
@@ -184,38 +193,17 @@ export class CompactionError extends Error {
   }
 }
 
-/**
- * 执行一次压缩：选区间 → 重放该区间的文字 → 追加指令请求摘要 → 校验结果。
- * 摘要被输出上限截断或为空都视为失败，绝不写入半截检查点。
- */
-export const compactConversation = async ({
-  history,
-  previous,
-  provider,
-  model,
-  system,
-  force = false,
-  signal,
-}: CompactionInput): Promise<CompactionOutcome> => {
-  const window = contextWindowOf(model)
-  const plan = selectCompactionPlan(history, Math.round(window * COMPACT_RETAIN_RATIO), force)
-  if (!plan) {
-    throw new CompactionError('nothing-to-compact')
-  }
-  const replay = toCompactionReplay(history, plan.coveredUntil)
-  // 旧检查点并进指令消息里，而不是单发一条 user：连续两条 user 会被部分服务商判为非法
-  const instruction = previous?.summary.trim()
-    ? [
-        'A prior checkpoint covering even earlier history follows. Merge its still-true facts into the new',
-        'summary, drop what is stale, and do not copy it forward verbatim.',
-        '',
-        '<compacted-summary>',
-        previous.summary.trim(),
-        '</compacted-summary>',
-        '',
-        COMPACTION_INSTRUCTION,
-      ].join('\n')
-    : COMPACTION_INSTRUCTION
+/** 跑一次摘要请求并校验结果；截断或空摘要都视为失败，绝不写入半截检查点 */
+const summarize = async (
+  replay: MessageParam[],
+  instruction: string,
+  {
+    provider,
+    model,
+    system,
+    signal,
+  }: Pick<CompactionInput, 'provider' | 'model' | 'system' | 'signal'>
+): Promise<string> => {
   const messages: MessageParam[] = [...replay, { role: 'user', content: instruction }]
   const body: CreateMessageRequest = {
     model,
@@ -255,9 +243,70 @@ export const compactConversation = async ({
   if (stopReason === 'max_tokens' || !text.trim()) {
     throw new CompactionError('summarize-failed')
   }
+  return text.trim()
+}
+
+/** 旧检查点并进指令消息里，而不是单发一条 user：连续两条 user 会被部分服务商判为非法 */
+const mergeInstruction = (previous: string | undefined): string =>
+  previous?.trim()
+    ? [
+        'A prior checkpoint covering even earlier history follows. Merge its still-true facts into the new',
+        'summary, drop what is stale, and do not copy it forward verbatim.',
+        '',
+        '<compacted-summary>',
+        previous.trim(),
+        '</compacted-summary>',
+        '',
+        COMPACTION_INSTRUCTION,
+      ].join('\n')
+    : COMPACTION_INSTRUCTION
+
+/**
+ * 执行一次压缩：选区间 → 把被覆盖轮次按窗口预算切成若干片 → 逐片重放并请求摘要，
+ * 前一片的摘要并进后一片的指令里，最终合并成一份完整检查点。
+ * 单片能装下时与原来的行为一致；导入的超长会话（重放超窗口）也能压出来。
+ */
+export const compactConversation = async ({
+  history,
+  previous,
+  provider,
+  model,
+  system,
+  force = false,
+  signal,
+}: CompactionInput): Promise<CompactionOutcome> => {
+  const window = contextWindowOf(model)
+  const plan = selectCompactionPlan(history, Math.round(window * COMPACT_RETAIN_RATIO), force)
+  if (!plan) {
+    throw new CompactionError('nothing-to-compact')
+  }
+  // 按估算 token 切片：每片不超过窗口的一半，至少包含一轮
+  const budget = Math.max(1, Math.round(window * REPLAY_BUDGET_RATIO))
+  const chunks: CompactionRound[][] = []
+  let current: CompactionRound[] = []
+  let currentTokens = 0
+  for (const round of plan.covered) {
+    const tokens = roundTokens(round)
+    if (current.length > 0 && currentTokens + tokens > budget) {
+      chunks.push(current)
+      current = []
+      currentTokens = 0
+    }
+    current.push(round)
+    currentTokens += tokens
+  }
+  if (current.length > 0) {
+    chunks.push(current)
+  }
+
+  let summary = previous?.summary.trim() || ''
+  for (const chunk of chunks) {
+    const replay = toCompactionReplay(chunk)
+    summary = await summarize(replay, mergeInstruction(summary), { provider, model, system, signal })
+  }
 
   return {
-    summary: text.trim(),
+    summary,
     coveredUntil: plan.coveredUntil,
     rounds: plan.rounds,
     tokens: plan.tokens,
