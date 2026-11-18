@@ -40,7 +40,7 @@ type Settings = {
   fileResend: FileResend
   /** 文件解析深度；快速模式只提文字，专家模式走版面解析 */
   parseDepth: ParseDepth
-  /** 接近上下文窗口上限时自动把早期轮次压成摘要；默认开启 */
+  /** 达到阈值时自动把早期轮次压成摘要；默认关闭，超过窗口 100% 时另有不可关的兜底压缩 */
   autoCompact: boolean
   /** 自动压缩的触发阈值，按窗口的百分比记（30~80）；整数存储避免浮点误差 */
   compactThreshold: number
@@ -57,8 +57,8 @@ export const MIN_CONTEXT_LIMIT = 1
 export const MAX_CONTEXT_LIMIT = 50
 
 /** 自动压缩阈值：按窗口百分比，整数存储 */
-export const MIN_COMPACT_THRESHOLD = 30
-export const MAX_COMPACT_THRESHOLD = 80
+export const MIN_COMPACT_THRESHOLD = 20
+export const MAX_COMPACT_THRESHOLD = 100
 export const DEFAULT_COMPACT_THRESHOLD = 80
 
 /**
@@ -79,14 +79,14 @@ export const FILE_MODE_PRESETS: Record<'fast' | 'expert', FileModeValues> = {
   fast: {
     parseDepth: 'text',
     fileResend: 'once',
-    autoCompact: true,
+    autoCompact: false,
     compactThreshold: DEFAULT_COMPACT_THRESHOLD,
     contextLimit: CONTEXT_LIMIT_UNLIMITED,
   },
   expert: {
     parseDepth: 'layout',
     fileResend: 'every-turn',
-    autoCompact: true,
+    autoCompact: false,
     compactThreshold: 50,
     contextLimit: CONTEXT_LIMIT_UNLIMITED,
   },
@@ -240,8 +240,8 @@ export const useSettings = create<Settings>(() => ({
   contextLimit: initialContextLimit(),
   fileResend: initialFileResend(),
   parseDepth: initialParseDepth(),
-  // 默认开启：阈值 80% 时日常对话不会触发，只在极端会话里当兜底
-  autoCompact: read(KEYS.autoCompact) !== 'false',
+  // 默认关闭：平时不主动压缩，超过窗口 100% 时发送前仍会兜底压缩（见 streamReply）
+  autoCompact: read(KEYS.autoCompact) === 'true',
   compactThreshold: initialCompactThreshold(),
 }))
 

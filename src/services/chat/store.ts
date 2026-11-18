@@ -1214,32 +1214,39 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
       let preparing = true
       let receivedContent = false
       try {
-        // 自动压缩：估算已接近窗口上限时先把早期轮次压成检查点。
+        // 保底压缩：估算超过窗口 100% 时再不压缩，请求必然被上游拒绝，与开关无关。
+        // 主动压缩：开了「自动压缩上下文」且达到阈值时提前压，省额度也少丢细节。
         // 压缩失败只记在控制台，继续按原有方式发送，绝不因压缩问题挡住消息。
-        if (useSettings.getState().autoCompact) {
-          const autoModel = resolveModel(initial.model, provider)
-          const { compactThreshold } = useSettings.getState()
-          const pressure = estimateContextTokens(request.history)
-          if (pressure >= contextWindowOf(autoModel) * (compactThreshold / 100)) {
-            const done = await runCompaction(
-              sessionId,
-              request.history,
-              controller.signal
-            ).catch((error: unknown) => {
-              // 没有可压内容或用户中断都不必打扰；只有摘要真的失败才提示
-              const silent =
-                error instanceof CompactionError &&
-                (error.reason === 'nothing-to-compact' || error.reason === 'aborted')
-              if (!silent) {
-                // 自动压缩失败在界面上只有一句提示，详细原因打到控制台便于排查
-                // eslint-disable-next-line no-console
-                console.warn('[auto-compact] failed:', error)
-                showToast({ key: 'settingsAutoCompactFailed' })
-              }
-              return null
-            })
-            // 自动压缩静默发生，成功时提示一次；否则用户会以为早期消息凭空消失
-            if (done) {
+        const autoModel = resolveModel(initial.model, provider)
+        const pressureWindow = contextWindowOf(autoModel)
+        const pressure = estimateContextTokens(request.history)
+        const overWindow = pressure >= pressureWindow
+        const { autoCompact, compactThreshold } = useSettings.getState()
+        const proactive = autoCompact && pressure >= pressureWindow * (compactThreshold / 100)
+        if (overWindow || proactive) {
+          const done = await runCompaction(
+            sessionId,
+            request.history,
+            controller.signal
+          ).catch((error: unknown) => {
+            // 没有可压内容或用户中断都不必打扰；只有摘要真的失败才提示
+            const silent =
+              error instanceof CompactionError &&
+              (error.reason === 'nothing-to-compact' || error.reason === 'aborted')
+            if (!silent) {
+              // 自动压缩失败在界面上只有一句提示，详细原因打到控制台便于排查
+              // eslint-disable-next-line no-console
+              console.warn('[auto-compact] failed:', error)
+              showToast({ key: 'settingsAutoCompactFailed' })
+            }
+            return null
+          })
+          // 自动压缩静默发生，成功时提示一次；否则用户会以为早期消息凭空消失
+          if (done) {
+            if (overWindow && !proactive) {
+              // 保底压缩在开关关闭时也会发生，必须点明原因
+              showToast({ key: 'chatCompactOverWindow' })
+            } else {
               const saved = savedTokensOf(done)
               showToast(
                 saved > 0

@@ -131,8 +131,9 @@ export const en = {
     'Compact once the context fills this share of the model window. Lower it to replace older rounds with a summary sooner — cheaper, but details are lost earlier.',
   settingsAutoCompact: 'Auto-compact context',
   settingsAutoCompactDescription:
-    'When the estimated usage reaches the auto-compact threshold, older rounds are condensed into a summary before sending. A failed summary never blocks the message.',
+    'Off by default. When enabled, older rounds are condensed into a summary once usage reaches the threshold; past 100% of the window it also compacts as a last resort when off, or the request cannot be sent.',
   chatCompacting: 'Compacting earlier context to save tokens…',
+  chatCompactOverWindow: 'Context exceeded the window — compacted before sending',
   settingsAutoCompactFailed: 'Compaction did not finish — try compacting manually',
   settingsAutoCompactDone: 'Compaction complete, saved about {tokens} tokens',
   settingsAutoCompactDoneTight: 'Compaction complete, but nothing was saved this time',

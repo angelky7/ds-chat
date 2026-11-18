@@ -123,8 +123,9 @@ export const zh = {
     '上下文占用达到模型窗口的这个比例时自动压缩。调低会更早把早期对话换成摘要，更省额度，但细节丢得更早。',
   settingsAutoCompact: '自动压缩上下文',
   settingsAutoCompactDescription:
-    '估算用量达到「自动压缩阈值」时，先把较早的轮次压成摘要再发送。摘要失败不影响发送。',
+    '默认关闭。开启后，估算用量达到「自动压缩阈值」就先把较早的轮次压成摘要再发送；超过窗口 100% 时即使关闭也会兜底压缩，否则请求无法发送。',
   chatCompacting: '正在压缩早期上下文，为你节省 token…',
+  chatCompactOverWindow: '上下文超出窗口，已自动压缩后再发送',
   settingsAutoCompactFailed: '压缩未完成，建议手动压缩',
   settingsAutoCompactDone: '压缩完成，约节约了 {tokens} token',
   settingsAutoCompactDoneTight: '压缩完成，但这次没省下 token',
