@@ -1,40 +1,3 @@
-/* 摘要面板：贴在设置项下方，左右留白与相邻行一致 */
-.panel {
-  margin: -4px 16px 12px;
-  padding: 12px 14px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 12px;
-  background: var(--dsw-alias-bg-layer-3);
-}
-
-.summary {
-  max-height: 260px;
-  margin: 0;
-  overflow: auto;
-  color: var(--dsw-alias-label-primary);
-  font-family: inherit;
-  font-size: 12px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.panelFoot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--dsw-alias-border-l2);
-}
-
-.meta {
-  color: var(--dsw-alias-label-tertiary);
-  font-size: 12px;
-  line-height: 1.5;
-}
-
 .actions {
   display: flex;
   flex-shrink: 0;
@@ -52,4 +15,28 @@
 
 .pressureHigh {
   color: var(--dsw-alias-state-error-primary);
+}
+
+/* 恢复原文是低频操作，用文字链降低视觉权重，避免和「立即压缩」抢注意力 */
+.link {
+  flex: none;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--dsw-alias-label-primary);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--dsw-alias-brand-primary);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
 }
