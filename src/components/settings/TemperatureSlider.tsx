@@ -8,7 +8,8 @@ import {
   setTemperature,
   useSettings,
 } from '../../services/settings.js'
-import styles from './TemperatureSlider.module.css'
+import { MduiSlider } from '../base/MduiSlider.js'
+import styles from './SliderField.module.css'
 
 /**
  * 采样温度滑块：0~2，默认 1。
@@ -23,16 +24,13 @@ export const TemperatureSlider = ({ className }: { className?: string }) => {
         <span className={styles.label}>{t('settingsTemperature')}</span>
         <span className={styles.value}>{temperature.toFixed(1)}</span>
       </div>
-      <input
-        className={styles.range}
-        type="range"
+      <MduiSlider
+        value={temperature}
         min={MIN_TEMPERATURE}
         max={MAX_TEMPERATURE}
         step={0.1}
-        value={temperature}
-        aria-label={t('settingsTemperature')}
-        aria-valuetext={temperature.toFixed(1)}
-        onChange={(event) => setTemperature(Number(event.target.value))}
+        label={t('settingsTemperature')}
+        onChange={setTemperature}
       />
       <div className={styles.foot}>
         <span className={styles.hint}>{t('settingsTemperatureDescription')}</span>

@@ -978,8 +978,15 @@ const prepareFiles = async (sessionId: string, request: Request, signal: AbortSi
   }
 
   const pending = new Map<string, FileAttachment>()
+  // 只看会进入请求的轮次：被上下文上限截掉的轮次不必再上传附件
+  const contextLimit = useSettings.getState().contextLimit
+  const contextRounds = getContextRounds(request.history)
+  const visibleRounds =
+    contextLimit > 0 && contextRounds.length > contextLimit
+      ? contextRounds.slice(-contextLimit)
+      : contextRounds
   // 不用 toReversed：旧版 iOS Safari 没有这个方法，补传历史附件时会抛错。
-  for (const [user] of [...getContextRounds(request.history)].reverse()) {
+  for (const [user] of [...visibleRounds].reverse()) {
     for (const file of user.files) {
       if (!file.serverId && !serverIds.has(file.id) && !pending.has(file.id)) {
         pending.set(file.id, file)
@@ -1022,7 +1029,12 @@ const collectServerFileIds = (request: Request): Set<string> => {
     }
   }
   add(request.question.files)
-  for (const [user] of getContextRounds(request.history)) {
+  // 只统计还在上下文窗口内的轮次，被截掉的附件即便失效也不必重传
+  const contextLimit = useSettings.getState().contextLimit
+  const rounds = getContextRounds(request.history)
+  const visibleRounds =
+    contextLimit > 0 && rounds.length > contextLimit ? rounds.slice(-contextLimit) : rounds
+  for (const [user] of visibleRounds) {
     add(user.files)
   }
   return ids
@@ -1139,13 +1151,16 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
             : () => undefined
         // latest_reminder 是 DeepSeek Flash 的扩展角色，其他模型与服务商都不接受
         const supportsReminder = provider.capabilities.files
+        // 附件重发只对支持 Files API 的服务商有意义，其余仍按内联图片的旧行为
+        const { contextLimit, fileResend } = useSettings.getState()
         const messages = toRequestMessages(
           prepared.history,
           prepared.question,
           prepared.prefix,
           initial.thinking ?? false,
           supportsReminder ? latestReminder : undefined,
-          images
+          images,
+          { contextLimit, fileResend: supportsReminder ? fileResend : 'once' }
         ).filter((message) => supportsReminder || message.role !== 'latest_reminder')
         // 内置默认提示词声明的是 DeepSeek 身份，别的服务商下留空更合适
         const system = resolveActiveSystemPrompt(model)

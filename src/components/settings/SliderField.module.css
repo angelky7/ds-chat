@@ -30,21 +30,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* 直接用原生 range + accent-color：跨浏览器一致，也自带键盘与触屏交互 */
-.range {
-  width: 100%;
-  height: 22px;
-  margin: 0;
-  accent-color: var(--dsw-alias-brand-primary);
-  cursor: pointer;
-
-  &:focus-visible {
-    outline: 2px solid var(--dsw-alias-brand-primary);
-    outline-offset: 4px;
-    border-radius: 8px;
-  }
-}
-
+/* 滑块本身由 mdui-slider 渲染，主题变量见 base/MduiSlider.module.css */
 .foot {
   display: flex;
   align-items: baseline;

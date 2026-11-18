@@ -11,7 +11,6 @@ export const zh = {
   sessionSaveFailed: '对话或附件尚未保存到本机，关闭页面可能丢失，请重试',
   sessionDeleteFailed: '删除对话失败，请重试',
   settings: '设置',
-  appName: 'DeepSleep',
   deleteSessionModalContentTitle: '永久删除对话',
   deleteSessionWithFilesDescription: '删除后，该对话及其中上传的文件将不可恢复。确认删除吗？',
   cancel: '取消',
@@ -93,6 +92,16 @@ export const zh = {
   settingsKeepRefused: '保留被撤回的回答',
   settingsKeepRefusedDescription:
     '模型判定不能回答时会撤回已经输出的内容。开启后这些内容会保留在对话里并标注「已撤回」，但它们仍然不会进入后续上下文。',
+  settingsContextGroup: '上下文与附件',
+  settingsContextLimit: '上下文轮次上限',
+  settingsContextLimitUnlimited: '∞',
+  settingsContextLimitDescription:
+    '只把最近 N 轮问答发给我；滑到最右为不限制。system 提示词与本轮提问始终保留。',
+  settingsFileResend: '历史附件重发',
+  settingsFileResendDescription:
+    '「每轮都重发」会让上下文窗口内的文档和图片一直带着，文件不会被遗忘，但 token 消耗会明显增加。',
+  settingsFileResendOnce: '只在发送时一次',
+  settingsFileResendEveryTurn: '每轮都重发',
   settingsTemperature: '模型温度',
   settingsTemperatureDescription:
     '越低回答越稳、越贴近原文，越高越发散；开启深度思考时固定为 1.0，此项不生效。',
@@ -183,6 +192,8 @@ export const zh = {
   appearanceBackgroundRemove: '移除',
   appearanceBackgroundOverlay: '图片遮罩',
   appearanceBackgroundDescription: '背景显示在对话区域，气泡与输入框保持可读',
+  appearanceBrand: '品牌标识',
+  appearanceBrandDescription: '切换后立即更新网页标题、左上角文字与图标，不影响对话内容。',
   appearanceThemeHint: '颜色按深色 / 浅色主题分别保存，当前编辑「{theme}」主题。',
   appearanceThemeLight: '浅色',
   appearanceThemeDark: '深色',

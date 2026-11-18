@@ -27,7 +27,9 @@ import {
   useSettings,
 } from '../../services/settings.js'
 import { AppearanceSettings } from './AppearanceSettings.js'
+import { ContextLimitSlider } from './ContextLimitSlider.js'
 import { DataSettings } from './DataSettings.js'
+import { FileResendSetting } from './FileResendSetting.js'
 import { LocationSelects } from './LocationSetting.js'
 import { PromptsSettings } from './PromptsSettings.js'
 import { ProviderSettings } from './ProviderSettings.js'
@@ -44,6 +46,7 @@ type Page =
   | 'prompts'
   | 'provider'
   | 'temperature'
+  | 'context'
   | 'voice'
   | 'data'
 
@@ -55,6 +58,7 @@ const TITLES: Record<Page, TranslationKey> = {
   prompts: 'settingDialogAsidePromptOptionLabel',
   provider: 'settingDialogAsideProviderOptionLabel',
   temperature: 'settingsTemperature',
+  context: 'settingsContextGroup',
   voice: 'settingsTtsVoice',
   data: 'settingDialogAsideDataOptionLabel',
 }
@@ -257,6 +261,11 @@ export const MobileSettings = () => {
             onClick={() => go('temperature')}
           />
           <Row
+            icon={<IconDataOutline16 />}
+            label={t('settingsContextGroup')}
+            onClick={() => go('context')}
+          />
+          <Row
             icon={<IconThinkOutline16 />}
             label={t('settingsKeepRefused')}
             trailing={
@@ -348,6 +357,15 @@ export const MobileSettings = () => {
       <div className={styles.padded}>
         <TemperatureSlider />
       </div>
+    ) : page === 'context' ? (
+      <>
+        <div className={styles.padded}>
+          <ContextLimitSlider />
+        </div>
+        <div className={styles.padded}>
+          <FileResendSetting />
+        </div>
+      </>
     ) : (
       <div className={styles.padded}>
         <DataSettings />

@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { useEffect, useMemo, useState } from 'react'
-import logoUrl from '../../assets/logo.png'
+import { brandLogo, brandName, useBrand } from '../../app/brand.js'
 import { useTranslate } from '../../i18n/index.js'
 import { IconPanelLeftOutline16, IconSettingsOutline16, NewChatIcon } from '../base/icons.js'
 import { setSiderCollapsed } from '../../services/settings.js'
@@ -19,6 +19,7 @@ import styles from './Sider.module.css'
 /** 展开的侧边栏：名称与收起按钮、开启新对话、按时间分组的会话列表、底部设置；移动端放在抽屉里，收起按钮关闭抽屉 */
 export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
   const t = useTranslate()
+  const brand = useBrand()
   const sessions = useChatStore((state) => state.sessions)
   const activeId = useChatStore((state) => state.activeId)
   const [now, setNow] = useState(Date.now)
@@ -54,8 +55,8 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
     <div className={clsx(styles.sider, mobile && styles.mobile)}>
       <div className={styles.top}>
         <div className={styles.brand}>
-          <img className={styles.logo} src={logoUrl} alt="" draggable={false} />
-          <div className={styles.appName}>{t('appName')}</div>
+          <img className={styles.logo} src={brandLogo(brand)} alt="" draggable={false} />
+          <div className={styles.appName}>{brandName(brand)}</div>
         </div>
         <IconButton
           size="m"

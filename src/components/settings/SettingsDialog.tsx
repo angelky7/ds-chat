@@ -25,7 +25,9 @@ import { Modal } from '../base/Modal.js'
 import { Select } from '../base/Select.js'
 import { Switch } from '../base/Switch.js'
 import { AppearanceSettings } from './AppearanceSettings.js'
+import { ContextLimitSlider } from './ContextLimitSlider.js'
 import { DataSettings } from './DataSettings.js'
+import { FileResendSetting } from './FileResendSetting.js'
 import { LocationSetting } from './LocationSetting.js'
 import { MobileSettings } from './MobileSettings.js'
 import { PromptsSettings } from './PromptsSettings.js'
@@ -119,6 +121,8 @@ const SettingsContent = () => {
               <TtsVoiceSetting />
               <KeepRefusedSetting />
               <TemperatureSlider />
+              <ContextLimitSlider />
+              <FileResendSetting />
               <LocationSetting />
               <VersionSetting />
             </>

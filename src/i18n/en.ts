@@ -14,7 +14,6 @@ export const en = {
     'Chats or attachments have not been saved locally. Retry before closing this page.',
   sessionDeleteFailed: 'Unable to delete this chat. Please try again.',
   settings: 'Settings',
-  appName: 'DeepSleep',
   deleteSessionModalContentTitle: 'Delete chat?',
   deleteSessionWithFilesDescription:
     'This chat and its uploaded files will be permanently deleted and cannot be recovered. Delete this chat?',
@@ -101,6 +100,16 @@ export const en = {
   settingsKeepRefused: 'Keep retracted answers',
   settingsKeepRefusedDescription:
     'When the model refuses to answer, the text it already produced is normally removed. Turn this on to keep that text and mark it as retracted — it still will not be sent in later context.',
+  settingsContextGroup: 'Context & attachments',
+  settingsContextLimit: 'Context rounds',
+  settingsContextLimitUnlimited: '∞',
+  settingsContextLimitDescription:
+    'Only the most recent N question/answer rounds are sent; slide to the far right for no limit. The system prompt and the current question are always kept.',
+  settingsFileResend: 'Resend old attachments',
+  settingsFileResendDescription:
+    '"Every turn" keeps documents and images inside the context window attached on each request, so files are never forgotten — at the cost of noticeably more tokens.',
+  settingsFileResendOnce: 'Once, when sent',
+  settingsFileResendEveryTurn: 'Every turn',
   settingsTemperature: 'Model temperature',
   settingsTemperatureDescription:
     'Lower keeps answers steady and close to the source; higher is more varied. Fixed at 1.0 while deep thinking is on.',
@@ -198,6 +207,9 @@ export const en = {
   appearanceBackgroundOverlay: 'Image overlay',
   appearanceBackgroundDescription:
     'The background covers the chat area; bubbles and the input box stay readable',
+  appearanceBrand: 'Brand',
+  appearanceBrandDescription:
+    'Updates the page title, sidebar label and icon immediately. Chat content is not affected.',
   appearanceThemeHint:
     'Colors are saved separately for light and dark themes. Currently editing the {theme} theme.',
   appearanceThemeLight: 'light',

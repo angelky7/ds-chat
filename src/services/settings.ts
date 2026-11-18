@@ -7,10 +7,18 @@ export type Locale = 'zh-CN' | 'en-US'
 /** 主题偏好；默认跟随系统 */
 export type ThemePreference = 'light' | 'dark' | 'system'
 
-/** 本机设置，存 localStorage：语言、主题、位置、朗读音色、深度思考与智能搜索开关、侧边栏收起状态、是否保留被撤回的回答、采样温度 */
+/** 站点品牌：默认官方 DeepSeek，可切到自用的 DeepSleep 标识 */
+export type Brand = 'deepseek' | 'deepsleep'
+
+/** 历史附件重发方式：once 只带一次（默认），every-turn 每轮都回传 */
+export type FileResend = 'once' | 'every-turn'
+
+/** 本机设置，存 localStorage：语言、主题、品牌、位置、朗读音色、深度思考与智能搜索开关、侧边栏收起状态、是否保留被撤回的回答、采样温度、上下文轮次上限、附件重发方式 */
 type Settings = {
   locale: Locale
   themePreference: ThemePreference
+  /** 站点品牌，影响标题、左上角文字与 logo */
+  brand: Brand
   location: UserLocation | null
   ttsVoice: TtsVoice
   thinking: boolean
@@ -20,6 +28,10 @@ type Settings = {
   keepRefusedAnswer: boolean
   /** 采样温度 0~2，官方默认 1；只在非思考模式下生效，思考模式固定 1.0 */
   temperature: number
+  /** 请求里保留的历史轮次上限；0 表示不限制 */
+  contextLimit: number
+  /** 历史附件是否每轮重发；默认只在那一轮发一次 */
+  fileResend: FileResend
 }
 
 /** 温度取值范围与默认值，与 DeepSeek 官方一致 */
@@ -27,15 +39,23 @@ export const MIN_TEMPERATURE = 0
 export const MAX_TEMPERATURE = 2
 export const DEFAULT_TEMPERATURE = 1
 
+/** 上下文轮次上限：0 表示无限，其余落在 1~50 轮 */
+export const CONTEXT_LIMIT_UNLIMITED = 0
+export const MIN_CONTEXT_LIMIT = 1
+export const MAX_CONTEXT_LIMIT = 50
+
 const KEYS = {
   locale: 'chat-demo:locale',
   location: 'chat-demo:location',
   themePreference: 'chat-demo:theme-preference',
+  brand: 'chat-demo:brand',
   ttsVoice: 'chat-demo:tts-voice',
   thinking: 'chat-demo:thinking',
   search: 'chat-demo:search',
   siderCollapsed: 'chat-demo:sider-collapsed',
   temperature: 'chat-demo:temperature',
+  contextLimit: 'chat-demo:context-limit',
+  fileResend: 'chat-demo:file-resend',
   keepRefusedAnswer: 'chat-demo:keep-refused-answer',
 } as const
 
@@ -97,6 +117,9 @@ const initialThemePreference = (): ThemePreference => {
   return saved === 'light' || saved === 'dark' ? saved : 'system'
 }
 
+/** 默认官方品牌；只有明确存过 deepsleep 才切换 */
+const initialBrand = (): Brand => (read(KEYS.brand) === 'deepsleep' ? 'deepsleep' : 'deepseek')
+
 /** 未保存过时使用服务端默认音色 stella（海星） */
 const initialTtsVoice = (): TtsVoice => (read(KEYS.ttsVoice) === 'tide' ? 'tide' : 'stella')
 
@@ -112,21 +135,45 @@ const initialTemperature = (): number => {
     : DEFAULT_TEMPERATURE
 }
 
+/** 默认不限制轮次；存了非法值也回到不限制 */
+const initialContextLimit = (): number => {
+  const raw = read(KEYS.contextLimit)
+  if (raw === null || raw.trim() === '') {
+    return CONTEXT_LIMIT_UNLIMITED
+  }
+  const value = Math.round(Number(raw))
+  return Number.isFinite(value) && value >= MIN_CONTEXT_LIMIT && value <= MAX_CONTEXT_LIMIT
+    ? value
+    : CONTEXT_LIMIT_UNLIMITED
+}
+
+/** 默认只在发送附件的那一轮带文件 */
+const initialFileResend = (): FileResend =>
+  read(KEYS.fileResend) === 'every-turn' ? 'every-turn' : 'once'
+
 export const useSettings = create<Settings>(() => ({
   locale: initialLocale(),
   location: initialLocation(),
   themePreference: initialThemePreference(),
+  brand: initialBrand(),
   ttsVoice: initialTtsVoice(),
   thinking: read(KEYS.thinking) === 'true',
   search: read(KEYS.search) === 'true',
   siderCollapsed: read(KEYS.siderCollapsed) === 'true',
   keepRefusedAnswer: read(KEYS.keepRefusedAnswer) === 'true',
   temperature: initialTemperature(),
+  contextLimit: initialContextLimit(),
+  fileResend: initialFileResend(),
 }))
 
 export const setLocale = (locale: Locale) => {
   write(KEYS.locale, locale)
   useSettings.setState({ locale })
+}
+
+export const setBrand = (brand: Brand) => {
+  write(KEYS.brand, brand)
+  useSettings.setState({ brand })
 }
 
 export const setLocation = (value: UserLocation | null) => {
@@ -176,3 +223,21 @@ export const setTemperature = (value: number) => {
 }
 
 export const resetTemperature = () => setTemperature(DEFAULT_TEMPERATURE)
+
+/** 轮次上限按整数保存；0 表示不限制，其余夹在 1~50 */
+export const setContextLimit = (value: number) => {
+  const rounded = Math.round(value)
+  const clamped =
+    rounded <= CONTEXT_LIMIT_UNLIMITED
+      ? CONTEXT_LIMIT_UNLIMITED
+      : Math.min(MAX_CONTEXT_LIMIT, Math.max(MIN_CONTEXT_LIMIT, rounded))
+  write(KEYS.contextLimit, String(clamped))
+  useSettings.setState({ contextLimit: clamped })
+}
+
+export const resetContextLimit = () => setContextLimit(CONTEXT_LIMIT_UNLIMITED)
+
+export const setFileResend = (fileResend: FileResend) => {
+  write(KEYS.fileResend, fileResend)
+  useSettings.setState({ fileResend })
+}

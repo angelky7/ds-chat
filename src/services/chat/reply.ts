@@ -350,8 +350,9 @@ export const getContextRounds = (history: Message[]): [UserMessage, AssistantMes
 /**
  * 历史轮次的附件策略：附件正文在每次请求里都会重新计入输入长度，
  * 同一份文档留在上下文里越久，越容易把整段对话顶出模型上限。
- * - 文档一律不回传：解析后的正文往往上万 token，是超限的主因，内容已在当时的回答里消化；
- * - 图片保留最近一轮：追问画面细节仍需要原图，单张成本有限。
+ * - once：文档一律不回传，图片保留最近一轮（追问画面细节仍需要原图）；
+ * - every-turn：上下文窗口内的每一轮都按 file_id 重新带上文档与图片，
+ *   代价是 token 随轮次线性增长，换来的是文件不会被"忘掉"。
  */
 const HISTORIC_IMAGE_ROUNDS = 1
 
@@ -360,6 +361,14 @@ const HISTORIC_IMAGE_ROUNDS = 1
  * 当时的附件正文已不在上下文里，不必假装看过。
  */
 const OMITTED_ATTACHMENTS = '[Attached files in this round are no longer available in the context.]'
+
+/** 生成请求时的截断与附件策略；两个字段都有默认值，调用方只需传需要改的那个 */
+export type RequestOptions = {
+  /** 保留的历史轮次上限；0 或省略表示不限制 */
+  contextLimit?: number
+  /** 历史附件重发方式；默认 once */
+  fileResend?: 'once' | 'every-turn'
+}
 
 /**
  * 把会话转成请求的 messages：只保留「提问 + 有回答的回复」成对的轮次，最后接上本轮提问。
@@ -371,7 +380,8 @@ export const toRequestMessages = (
   prefix?: AssistantMessage,
   thinking = prefix?.thinking ?? false,
   latestReminder?: string,
-  images?: ImageResolver
+  images?: ImageResolver,
+  options: RequestOptions = {}
 ): MessageParam[] => {
   const messages: MessageParam[] = []
   let previousReminder: string | undefined
@@ -382,12 +392,18 @@ export const toRequestMessages = (
       previousReminder = reminder
     }
   }
-  const rounds = getContextRounds(history)
+  const contextRounds = getContextRounds(history)
+  // 截断只发生在轮次边界上：先成对筛选，再取最近 N 轮，不会留下孤立的 user / assistant。
+  const limit = options.contextLimit ?? 0
+  const rounds =
+    limit > 0 && contextRounds.length > limit ? contextRounds.slice(-limit) : contextRounds
+  // 内联图片模式（没有 Files API）用不到 every-turn，按 once 处理
+  const everyTurn = options.fileResend === 'every-turn' && !images
   rounds.forEach(([user, reply], index) => {
     const keepImages = index >= rounds.length - HISTORIC_IMAGE_ROUNDS
-    const files = keepImages ? user.files.filter((file) => file.isImage) : []
+    const files = everyTurn ? user.files : keepImages ? user.files.filter((file) => file.isImage) : []
     const blocks = toFileBlocks(files, images)
-    // 附件没能进请求（文档不回传，或本地已没有原件）时补一句说明，
+    // 附件没能进请求（文档不回传、已超出上下文、或本地已没有原件）时补一句说明，
     // 既保住这一轮问答，也避免模型假装读过原文。
     const content = [user.content, user.files.length > 0 && blocks.length === 0 ? OMITTED_ATTACHMENTS : '']
       .filter(Boolean)

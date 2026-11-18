@@ -1,0 +1,35 @@
+/**
+ * mdui 滑块的主题变量按「R,G,B 三元组」取值（内部走 rgb(var(--mdui-color-*))），
+ * 所以这里给的是逗号分隔的数字，与 app 的 rgb() 变量保持同一色值。
+ */
+.host {
+  display: block;
+  /* 浅色：品牌蓝 blue-500、正文 neutral-bluish-1000、轨道 neutral-bluish-200 */
+  --mdui-color-primary: 57, 100, 254;
+  --mdui-color-on-primary: 255, 255, 255;
+  --mdui-color-on-surface: 15, 17, 21;
+  --mdui-color-on-surface-variant: 129, 133, 140;
+  --mdui-color-surface-container-highest: 225, 229, 238;
+  --mdui-color-background: 255, 255, 255;
+}
+
+/* 深色：品牌蓝 blue-450，轨道 neutral-bluish-800，文字提亮 */
+:global(body.dark) .host {
+  --mdui-color-primary: 86, 134, 254;
+  --mdui-color-on-surface: 249, 250, 251;
+  --mdui-color-on-surface-variant: 173, 178, 184;
+  --mdui-color-surface-container-highest: 53, 54, 56;
+  --mdui-color-background: 21, 21, 23;
+}
+
+.host mdui-slider {
+  display: block;
+  width: 100%;
+  /* mdui 默认高度偏大，收到与自定义控件接近的 32px */
+  height: 32px;
+}
+
+/* 自定义元素自身不接收 React 的 className，这里通过宿主选择器统一调整内边距 */
+.host mdui-slider::part(track-active) {
+  border-radius: 4096px;
+}

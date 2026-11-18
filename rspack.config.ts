@@ -105,9 +105,10 @@ export const createConfig = ({
     new rspack.CopyRspackPlugin({
       patterns: [
         { from: path.resolve(root, 'LICENSE'), to: 'LICENSE', toType: 'file' },
-        // 站点标志固定放在根目录，index.html 用相对路径引用，子路径部署与 file:// 都能用
+        // 站点标志固定放在根目录，index.html 用相对路径引用，子路径部署与 file:// 都能用。
+        // 默认品牌是 DeepSeek；切到 DeepSleep 时由 app/brand.ts 在运行时改写 link 与标题。
         {
-          from: path.resolve(root, 'src/assets/logo.png'),
+          from: path.resolve(root, 'src/assets/deepseek-logo.png'),
           to: 'favicon.png',
           toType: 'file',
         },

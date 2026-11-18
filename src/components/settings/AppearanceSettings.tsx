@@ -12,6 +12,7 @@ import {
   type BackgroundKind,
   type ThemeAppearance,
 } from '../../services/appearance.js'
+import { setBrand, useSettings, type Brand } from '../../services/settings.js'
 import { Avatar } from '../messages/Avatar.js'
 import { Switch } from '../base/Switch.js'
 import { Button } from '../base/Button.js'
@@ -46,6 +47,7 @@ export const AppearanceSettings = () => {
 
   return (
     <>
+      <BrandSetting />
       <div className={styles.hint}>
         {t('appearanceThemeHint', {
           theme: t(theme === 'dark' ? 'appearanceThemeDark' : 'appearanceThemeLight'),
@@ -114,6 +116,30 @@ export const AppearanceSettings = () => {
         </Modal>
       ) : null}
     </>
+  )
+}
+
+/** 品牌：切换标题、左上角文字与 logo，纯前端立即生效，不影响对话内容 */
+const BrandSetting = () => {
+  const t = useTranslate()
+  const brand = useSettings((state) => state.brand)
+  return (
+    <SettingCell
+      label={t('appearanceBrand')}
+      description={t('appearanceBrandDescription')}
+      status={null}
+      action={
+        <Select
+          ariaLabel={t('appearanceBrand')}
+          value={brand}
+          options={[
+            { value: 'deepseek', label: 'DeepSeek' },
+            { value: 'deepsleep', label: 'DeepSleep' },
+          ]}
+          onChange={(value) => setBrand(value as Brand)}
+        />
+      }
+    />
   )
 }
 
