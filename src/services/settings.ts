@@ -115,6 +115,7 @@ const KEYS = {
   fileResend: 'chat-demo:file-resend',
   parseDepth: 'chat-demo:parse-depth',
   autoCompact: 'chat-demo:auto-compact',
+  autoCompactReset: 'chat-demo:auto-compact-reset',
   compactThreshold: 'chat-demo:compact-threshold',
   keepRefusedAnswer: 'chat-demo:keep-refused-answer',
 } as const
@@ -226,6 +227,16 @@ const initialCompactThreshold = (): number => {
     : DEFAULT_COMPACT_THRESHOLD
 }
 
+/** 见 useSettings 里 autoCompact 的迁移注释：标记写回后，用户后续的开关照常生效 */
+const initialAutoCompact = (): boolean => {
+  if (read(KEYS.autoCompactReset) !== '1') {
+    write(KEYS.autoCompactReset, '1')
+    write(KEYS.autoCompact, 'false')
+    return false
+  }
+  return read(KEYS.autoCompact) === 'true'
+}
+
 export const useSettings = create<Settings>(() => ({
   locale: initialLocale(),
   location: initialLocation(),
@@ -240,8 +251,12 @@ export const useSettings = create<Settings>(() => ({
   contextLimit: initialContextLimit(),
   fileResend: initialFileResend(),
   parseDepth: initialParseDepth(),
-  // 默认关闭：平时不主动压缩，超过窗口 100% 时发送前仍会兜底压缩（见 streamReply）
-  autoCompact: read(KEYS.autoCompact) === 'true',
+  /**
+   * 一次性迁移：这一版把所有人的自动压缩强制关闭（大多数人用不上，
+   * 超窗口 100% 另有兜底压缩；确实需要的用户再手动打开并正常保存）。
+   * 迁移标记保证只执行一次，之后用户自己的开关照常生效。
+   */
+  autoCompact: initialAutoCompact(),
   compactThreshold: initialCompactThreshold(),
 }))
 
