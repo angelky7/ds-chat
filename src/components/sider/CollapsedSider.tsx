@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import logoUrl from '../../assets/deepseek-logo.png'
+import logoUrl from '../../assets/logo.png'
 import { IconPanelLeftOutline16, NewChatIcon } from '../base/icons.js'
 import { useTranslate } from '../../i18n/index.js'
 import { setSiderCollapsed } from '../../services/settings.js'

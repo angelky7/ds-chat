@@ -105,19 +105,25 @@ export const createConfig = ({
     new rspack.CopyRspackPlugin({
       patterns: [
         { from: path.resolve(root, 'LICENSE'), to: 'LICENSE', toType: 'file' },
-        // 站点图标固定放在根目录，index.html 用相对路径引用，子路径部署与 file:// 都能用
+        // 站点标志固定放在根目录，index.html 用相对路径引用，子路径部署与 file:// 都能用
         {
-          from: path.resolve(root, 'src/assets/deepseek-logo.png'),
+          from: path.resolve(root, 'src/assets/logo.png'),
           to: 'favicon.png',
           toType: 'file',
         },
         // 图标与 manifest 放根目录，index.html 与 manifest 都用相对路径
         { from: path.resolve(root, 'src/assets/icon-192.png'), to: 'icon-192.png', toType: 'file' },
         { from: path.resolve(root, 'src/assets/icon-512.png'), to: 'icon-512.png', toType: 'file' },
-        { from: path.resolve(root, 'src/manifest.webmanifest'), to: 'manifest.webmanifest', toType: 'file' },
-        // 图标与 manifest 放根目录，index.html 与 manifest 都用相对路径
-        { from: path.resolve(root, 'src/assets/icon-192.png'), to: 'icon-192.png', toType: 'file' },
-        { from: path.resolve(root, 'src/assets/icon-512.png'), to: 'icon-512.png', toType: 'file' },
+        {
+          from: path.resolve(root, 'src/assets/apple-touch-icon.png'),
+          to: 'apple-touch-icon.png',
+          toType: 'file',
+        },
+        {
+          from: path.resolve(root, 'src/assets/icon-maskable-512.png'),
+          to: 'icon-maskable-512.png',
+          toType: 'file',
+        },
         { from: path.resolve(root, 'src/manifest.webmanifest'), to: 'manifest.webmanifest', toType: 'file' },
       ],
     }),
