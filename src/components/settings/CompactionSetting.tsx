@@ -6,7 +6,7 @@ import {
   CompactionError,
   contextWindowOf,
   estimateContextTokens,
-  estimateTokens,
+  savedTokensOf,
 } from '../../services/chat/compact.js'
 import { clearCompaction, compactSession, useChatStore } from '../../services/chat/store.js'
 import { activeProvider } from '../../services/providers.js'
@@ -17,17 +17,13 @@ import styles from './CompactionSetting.module.css'
 /** 千分位，避免一长串数字难读 */
 const formatCount = (value: number) => value.toLocaleString()
 
-/** 省下的 token = 被覆盖轮次的估算量 - 摘要自身占用的量 */
-const savedTokens = (compaction: { tokens: number; summary: string }): number =>
-  Math.max(0, compaction.tokens - estimateTokens(compaction.summary))
-
 /** 结果文案：省下量为 0 说明摘要比原文还长，直说「这次没省」而不是显示 0 tokens */
 const compactStatus = (compaction: {
   rounds: number
   tokens: number
   summary: string
 }): SettingStatus => {
-  const saved = savedTokens(compaction)
+  const saved = savedTokensOf(compaction)
   return saved > 0
     ? {
         key: 'settingsCompacted',

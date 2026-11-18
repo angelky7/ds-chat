@@ -55,6 +55,13 @@ const roundTokens = ([user, reply]: [UserMessage, AssistantMessage]): number =>
 export const estimateContextTokens = (history: Message[]): number =>
   getContextRounds(history).reduce((sum, round) => sum + roundTokens(round), 0)
 
+/**
+ * 省下的 token = 被覆盖轮次的估算量 - 摘要自身占用的量。
+ * 摘要偶尔比原文还长，此时按 0 处理，界面另有「这次没省下」的说法。
+ */
+export const savedTokensOf = (compaction: { tokens: number; summary: string }): number =>
+  Math.max(0, compaction.tokens - estimateTokens(compaction.summary))
+
 export type CompactionPlan = {
   /** 被覆盖的最后一轮提问 id */
   coveredUntil: string

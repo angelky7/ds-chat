@@ -31,6 +31,7 @@ import {
   compactConversation,
   contextWindowOf,
   estimateContextTokens,
+  savedTokensOf,
 } from './compact.js'
 import {
   applyEvent,
@@ -1234,10 +1235,15 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
             })
             // 自动压缩静默发生，成功时提示一次；否则用户会以为早期消息凭空消失
             if (done) {
-              showToast({
-                key: 'settingsAutoCompactDone',
-                params: { rounds: done.rounds, tokens: done.tokens.toLocaleString() },
-              })
+              const saved = savedTokensOf(done)
+              showToast(
+                saved > 0
+                  ? {
+                      key: 'settingsAutoCompactDone',
+                      params: { tokens: saved.toLocaleString() },
+                    }
+                  : { key: 'settingsAutoCompactDoneTight' }
+              )
             }
           }
         }

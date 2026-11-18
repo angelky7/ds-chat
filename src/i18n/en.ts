@@ -133,8 +133,9 @@ export const en = {
   settingsAutoCompactDescription:
     'When the estimated usage reaches the auto-compact threshold, older rounds are condensed into a summary before sending. A failed summary never blocks the message.',
   chatCompacting: 'Compacting earlier context to save tokens…',
-  settingsAutoCompactFailed: 'Context compaction did not finish — try compacting manually',
-  settingsAutoCompactDone: 'Auto-compacted {rounds} older rounds (about {tokens} tokens)',
+  settingsAutoCompactFailed: 'Compaction did not finish — try compacting manually',
+  settingsAutoCompactDone: 'Compaction complete, saved about {tokens} tokens',
+  settingsAutoCompactDoneTight: 'Compaction complete, but nothing was saved this time',
   settingsCompactNow: 'Context compaction',
   settingsCompactDescription:
     'Condense older rounds into a structured checkpoint, then send that summary plus the most recent rounds. The original messages stay on this device and can be restored.',
