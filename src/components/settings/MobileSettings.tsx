@@ -27,6 +27,7 @@ import {
   useSettings,
 } from '../../services/settings.js'
 import { AppearanceSettings } from './AppearanceSettings.js'
+import { CompactionSetting } from './CompactionSetting.js'
 import { ContextLimitSlider } from './ContextLimitSlider.js'
 import { DataSettings } from './DataSettings.js'
 import { FileResendSetting } from './FileResendSetting.js'
@@ -364,6 +365,9 @@ export const MobileSettings = () => {
         </div>
         <div className={styles.padded}>
           <FileResendSetting />
+        </div>
+        <div className={styles.padded}>
+          <CompactionSetting />
         </div>
       </>
     ) : (

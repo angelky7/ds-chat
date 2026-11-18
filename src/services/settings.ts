@@ -32,6 +32,8 @@ type Settings = {
   contextLimit: number
   /** 历史附件是否每轮重发；默认只在那一轮发一次 */
   fileResend: FileResend
+  /** 接近上下文窗口上限时自动把早期轮次压成摘要；默认关闭 */
+  autoCompact: boolean
 }
 
 /** 温度取值范围与默认值，与 DeepSeek 官方一致 */
@@ -56,6 +58,7 @@ const KEYS = {
   temperature: 'chat-demo:temperature',
   contextLimit: 'chat-demo:context-limit',
   fileResend: 'chat-demo:file-resend',
+  autoCompact: 'chat-demo:auto-compact',
   keepRefusedAnswer: 'chat-demo:keep-refused-answer',
 } as const
 
@@ -164,6 +167,7 @@ export const useSettings = create<Settings>(() => ({
   temperature: initialTemperature(),
   contextLimit: initialContextLimit(),
   fileResend: initialFileResend(),
+  autoCompact: read(KEYS.autoCompact) === 'true',
 }))
 
 export const setLocale = (locale: Locale) => {
@@ -240,4 +244,9 @@ export const resetContextLimit = () => setContextLimit(CONTEXT_LIMIT_UNLIMITED)
 export const setFileResend = (fileResend: FileResend) => {
   write(KEYS.fileResend, fileResend)
   useSettings.setState({ fileResend })
+}
+
+export const setAutoCompact = (autoCompact: boolean) => {
+  write(KEYS.autoCompact, String(autoCompact))
+  useSettings.setState({ autoCompact })
 }

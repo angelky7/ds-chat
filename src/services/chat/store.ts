@@ -26,6 +26,12 @@ import {
 } from './drafts.js'
 import { createLatestReminder } from './latestReminder.js'
 import {
+  COMPACT_THRESHOLD_RATIO,
+  compactConversation,
+  contextWindowOf,
+  estimateContextTokens,
+} from './compact.js'
+import {
   applyEvent,
   canContinueReply,
   getContextRounds,
@@ -37,6 +43,7 @@ import {
 import {
   toSessionSummary,
   type AssistantMessage,
+  type Compaction,
   type FileAttachment,
   type Message,
   type Session,
@@ -118,6 +125,8 @@ type ChatState = {
   activeId: string | null
   /** 正在生成回复的会话 */
   streaming: Record<string, AbortController>
+  /** 正在压缩上下文的会话，用于按钮与提示的忙碌态 */
+  compacting: Record<string, boolean>
 }
 
 export const useChatStore = create<ChatState>(() => ({
@@ -130,6 +139,7 @@ export const useChatStore = create<ChatState>(() => ({
   sessionSaveErrors: {},
   activeId: null,
   streaming: {},
+  compacting: {},
 }))
 
 const { getState: get, setState: set } = useChatStore
@@ -585,6 +595,75 @@ const removeSessionData = async (id: string): Promise<boolean> => {
 }
 
 export const stopReply = (sessionId: string) => getStreamController(sessionId)?.abort()
+
+const setCompacting = (sessionId: string, busy: boolean) =>
+  // 置 false 而不是删除键：动态 delete 会拖慢对象形状，也过不了 lint
+  set((state) => ({ compacting: { ...state.compacting, [sessionId]: busy } }))
+
+/**
+ * 跑一次压缩并写回会话。失败时把 CompactionError 抛给调用方，
+ * 由自动流程吞掉、由手动流程展示原因；两种情况下已有检查点都保持不变。
+ */
+const runCompaction = async (
+  sessionId: string,
+  history: Message[],
+  signal: AbortSignal,
+  force = false
+): Promise<Compaction> => {
+  const session = getSession(sessionId)
+  if (!session) {
+    throw new Error('session missing')
+  }
+  const provider = activeProvider()
+  const model = resolveModel(null, provider)
+  setCompacting(sessionId, true)
+  try {
+    const outcome = await compactConversation({
+      history,
+      ...(session.compaction ? { previous: { summary: session.compaction.summary } } : {}),
+      provider,
+      model,
+      system: resolveActiveSystemPrompt(model),
+      force,
+      signal,
+    })
+    const compaction: Compaction = { ...outcome, at: Date.now() }
+    updateSession(sessionId, (current) => ({
+      ...current,
+      compaction,
+      updatedAt: Date.now(),
+    }))
+    persist(sessionId)
+    return compaction
+  } finally {
+    setCompacting(sessionId, false)
+  }
+}
+
+/** 手动压缩当前会话；没有说话内容、正在生成或没有可压缩区间时抛错由界面提示 */
+export const compactSession = async (sessionId: string): Promise<Compaction> => {
+  const session = getSession(sessionId)
+  if (!session || getStreamController(sessionId)) {
+    throw new Error('session busy')
+  }
+  const history = getVisibleMessages(session)
+  const controller = new AbortController()
+  // 手动压缩不受窗口比例限制：用户点了就压掉除最近两轮外的全部内容
+  return runCompaction(sessionId, history, controller.signal, true)
+}
+
+/** 丢弃检查点，恢复发送完整历史；原文一直在本地，不需要重建 */
+export const clearCompaction = (sessionId: string) => {
+  updateSession(sessionId, (session) => {
+    if (!session.compaction) {
+      return session
+    }
+    const next: Session = { ...session, updatedAt: Date.now() }
+    delete next.compaction
+    return next
+  })
+  persist(sessionId)
+}
 
 /**
  * 提交指定会话的最新草稿；null 表示新建会话。
@@ -1131,6 +1210,15 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
       let preparing = true
       let receivedContent = false
       try {
+        // 自动压缩：估算已接近窗口上限时先把早期轮次压成检查点。
+        // 压缩失败只记在控制台，继续按原有方式发送，绝不因压缩问题挡住消息。
+        if (useSettings.getState().autoCompact) {
+          const autoModel = resolveModel(initial.model, provider)
+          const pressure = estimateContextTokens(request.history)
+          if (pressure >= contextWindowOf(autoModel) * COMPACT_THRESHOLD_RATIO) {
+            await runCompaction(sessionId, request.history, controller.signal).catch(() => undefined)
+          }
+        }
         const prepared = provider.capabilities.files
           ? await prepareFiles(sessionId, request, controller.signal)
           : request
@@ -1153,6 +1241,8 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
         const supportsReminder = provider.capabilities.files
         // 附件重发只对支持 Files API 的服务商有意义，其余仍按内联图片的旧行为
         const { contextLimit, fileResend } = useSettings.getState()
+        // 压缩可能刚在本次发送前完成，这里读最新值而不是起始快照
+        const compaction = getSession(sessionId)?.compaction
         const messages = toRequestMessages(
           prepared.history,
           prepared.question,
@@ -1160,7 +1250,13 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
           initial.thinking ?? false,
           supportsReminder ? latestReminder : undefined,
           images,
-          { contextLimit, fileResend: supportsReminder ? fileResend : 'once' }
+          {
+            contextLimit,
+            fileResend: supportsReminder ? fileResend : 'once',
+            ...(compaction
+              ? { compaction: { summary: compaction.summary, coveredUntil: compaction.coveredUntil } }
+              : {}),
+          }
         ).filter((message) => supportsReminder || message.role !== 'latest_reminder')
         // 内置默认提示词声明的是 DeepSeek 身份，别的服务商下留空更合适
         const system = resolveActiveSystemPrompt(model)

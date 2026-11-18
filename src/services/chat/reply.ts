@@ -368,7 +368,15 @@ export type RequestOptions = {
   contextLimit?: number
   /** 历史附件重发方式；默认 once */
   fileResend?: 'once' | 'every-turn'
+  /** 已生效的上下文压缩：用摘要替换 coveredUntil 及其之前的轮次 */
+  compaction?: { summary: string; coveredUntil: string }
 }
+
+/** 摘要提示词里的包裹说明：把它当作已确立的背景，不要复述，也不要提到压缩本身 */
+const CHECKPOINT_PREAMBLE =
+  'This is an automatically generated checkpoint condensing an earlier span of the conversation to free up context. ' +
+  'Treat it as established background, build on it without restating it, and continue the task directly from the ' +
+  'messages that follow. Do not mention this checkpoint.'
 
 /**
  * 把会话转成请求的 messages：只保留「提问 + 有回答的回复」成对的轮次，最后接上本轮提问。
@@ -393,10 +401,27 @@ export const toRequestMessages = (
     }
   }
   const contextRounds = getContextRounds(history)
-  // 截断只发生在轮次边界上：先成对筛选，再取最近 N 轮，不会留下孤立的 user / assistant。
+  let rounds = contextRounds
+  /**
+   * 检查点不单独占一条 user 消息：它会和后面第一条提问连成两条 user，
+   * 严格的 Anthropic 兼容服务商会判为非法。这里把它并进第一条保留的提问。
+   */
+  let checkpoint = ''
+  // 摘要覆盖的轮次不再发送：coveredUntil 找不到对应轮次（切分支、消息被删）时按未压缩处理。
+  // 先按压缩裁剪、再按轮次上限裁剪，两者都只切在轮次边界上。
+  if (options.compaction) {
+    const coveredIndex = contextRounds.findIndex(
+      ([user]) => user.id === options.compaction?.coveredUntil
+    )
+    if (coveredIndex >= 0) {
+      rounds = contextRounds.slice(coveredIndex + 1)
+      checkpoint = `${CHECKPOINT_PREAMBLE}\n\n<compacted-summary>\n${options.compaction.summary.trim()}\n</compacted-summary>`
+    }
+  }
   const limit = options.contextLimit ?? 0
-  const rounds =
-    limit > 0 && contextRounds.length > limit ? contextRounds.slice(-limit) : contextRounds
+  if (limit > 0 && rounds.length > limit) {
+    rounds = rounds.slice(-limit)
+  }
   // 内联图片模式（没有 Files API）用不到 every-turn，按 once 处理
   const everyTurn = options.fileResend === 'every-turn' && !images
   rounds.forEach(([user, reply], index) => {
@@ -405,7 +430,12 @@ export const toRequestMessages = (
     const blocks = toFileBlocks(files, images)
     // 附件没能进请求（文档不回传、已超出上下文、或本地已没有原件）时补一句说明，
     // 既保住这一轮问答，也避免模型假装读过原文。
-    const content = [user.content, user.files.length > 0 && blocks.length === 0 ? OMITTED_ATTACHMENTS : '']
+    const content = [
+      // 检查点并入第一条保留的提问：既保住摘要，也不会出现连续两条 user
+      index === 0 ? checkpoint : '',
+      user.content,
+      user.files.length > 0 && blocks.length === 0 ? OMITTED_ATTACHMENTS : '',
+    ]
       .filter(Boolean)
       .join('\n\n')
     // 历史提问没有文字、附件也都没有可用内容时，提问为空，连同回答一起省略。
@@ -420,7 +450,15 @@ export const toRequestMessages = (
     )
   })
   appendReminder(latestReminder)
-  messages.push(toUserParam(question, images))
+  // 所有轮次都被覆盖时没有可并入的提问，只能把检查点并进本轮提问
+  messages.push(
+    toUserParam(
+      checkpoint && rounds.length === 0
+        ? { ...question, content: [checkpoint, question.content].filter(Boolean).join('\n\n') }
+        : question,
+      images
+    )
+  )
   if (prefix?.prefix) {
     const assistant = toAssistantParam(prefix, true, thinking)
     // 没有非空白正文或有效思考时直接重发原问题，避免服务端拒绝空 Prefill。
@@ -437,6 +475,28 @@ export const toRequestMessages = (
   return messages
 }
 
-/** 思考用时（秒），至少 1 秒 */
-export const getThinkingSeconds = (startedAt: number, endedAt: number) =>
+/**
+ * 压缩时重放被覆盖的区间：只带文字，不带附件正文。
+ * 摘要要保住的是结论、决策和未决问题，把这些轮次的文档正文重新读一遍既贵，
+ * 也容易让摘要请求本身超限——附件被略过的轮次补占位说明，避免模型以为还有原文。
+ */
+export const toCompactionReplay = (history: Message[], coveredUntil: string): MessageParam[] => {
+  const messages: MessageParam[] = []
+  for (const [user, reply] of getContextRounds(history)) {
+    if (!user.content && user.files.length === 0) {
+      continue
+    }
+    messages.push({
+      role: 'user',
+      content: user.content || OMITTED_ATTACHMENTS,
+    })
+    messages.push(toAssistantParam(reply))
+    if (user.id === coveredUntil) {
+      break
+    }
+  }
+  return messages
+}
+
+/** 思考用时（秒），至少 1 秒 */export const getThinkingSeconds = (startedAt: number, endedAt: number) =>
   Math.max(1, Math.round((endedAt - startedAt) / 1000))

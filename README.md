@@ -10,6 +10,7 @@ A static chat frontend based on the official DeepSeek [chat-demo](https://github
 ### Changes from upstream
 
 - Providers: DeepSeek, Kimi, MiMo, Qwen, SiliconFlow and OpenRouter, each with its own key, endpoint and model (see [Providers](#providers)).
+- Context compaction: condense older rounds into a structured checkpoint (manual or above 80% of the window); the original messages stay on this device. The policy and prompt layout are adapted from [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (MIT).
 - Prompts: multiple presets, variable placeholders, opening messages and one-click restore (see [Prompts](#prompts)).
 - Appearance: avatars, bubble colors and backgrounds (see [Appearance](#appearance)).
 

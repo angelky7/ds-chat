@@ -105,6 +105,24 @@ export type AssistantMessage = MessageBranch & {
 
 export type Message = UserMessage | AssistantMessage
 
+/**
+ * 上下文压缩产物：把「提问 + 回答」较早的一段压成摘要，后续请求用摘要替代那些轮次。
+ * 原文仍然留在会话里，只是不再发出去；coveredUntil 之前的轮次（含该条提问）视为已覆盖。
+ */
+export type Compaction = {
+  /** 模型生成的检查点正文（Markdown），已去掉包裹标签 */
+  summary: string
+  /** 被覆盖的最后一轮提问的消息 id；找不到该轮时检查点失效，按未压缩处理 */
+  coveredUntil: string
+  /** 被覆盖的轮数，仅用于界面展示 */
+  rounds: number
+  /** 被覆盖轮次的估算 token，仅用于界面展示与成本提示 */
+  tokens: number
+  /** 生成摘要时使用的模型 */
+  model: string
+  at: number
+}
+
 export type Session = {
   id: string
   title: string
@@ -114,7 +132,10 @@ export type Session = {
   messages: Message[]
   /** undefined 表示线性消息列表；null 表示空会话。 */
   rootMessageId?: string | null
+  /** 最近一次上下文压缩；缺省表示未压缩 */
+  compaction?: Compaction
 }
+
 
 /** 会话列表元数据；消息只在打开会话时加载。 */
 export type SessionSummary = Pick<Session, 'id' | 'title' | 'createdAt' | 'updatedAt'>
