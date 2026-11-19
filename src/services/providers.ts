@@ -589,17 +589,10 @@ export const messagesEndpoint = (provider: ActiveProvider): string =>
     ? `${provider.baseUrl}/v1/messages`
     : `${provider.baseUrl}/chat/completions`
 
-/** Anthropic 兼容入口的根地址：去掉末尾 /anthropic，根下还挂着 /models 等接口 */
-const anthropicRoot = (baseUrl: string) => baseUrl.replace(/\/+$/, '').replace(/\/anthropic$/, '')
-
-/**
- * 校验 Key 用的只读地址；DeepSeek 的 /models 挂在根路径下。
- * 用配置里的地址推导，这样换成中转/自建反代后校验也能通过，
- * 否则保存时会被官方域名判成「Key 无效」，导致只能用官方地址。
- */
+/** 校验 Key 用的只读地址；DeepSeek 的 /models 挂在根路径下 */
 export const modelsEndpoint = (provider: ActiveProvider): string =>
   provider.id === 'deepseek'
-    ? `${anthropicRoot(provider.baseUrl)}/models`
+    ? `${API_ORIGIN}/models`
     : provider.protocol === 'anthropic'
       ? `${provider.baseUrl}/v1/models`
       : `${provider.baseUrl}/models`
