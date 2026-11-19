@@ -28,10 +28,19 @@ const MIN_COVERED_ROUNDS = 2
  */
 const REPLAY_BUDGET_RATIO = 0.5
 
-/** 模型上下文窗口；未知模型按 200k 保守处理，宁可早压也不要把请求顶爆 */
+/**
+ * 模型上下文窗口；未知模型按 200k 保守处理，宁可早压也不要把请求顶爆。
+ * 第三方服务商按 OpenRouter `/api/v1/models` 的 context_length 登记，其余走 200k 默认值。
+ */
 const CONTEXT_WINDOWS: Record<string, number> = {
   'deepseek-flash': 1_000_000,
   'deepseek-v4-pro': 1_000_000,
+  // OpenRouter：Nemotron 系免费模型声明 1,000,000
+  'nvidia/nemotron-3.5-super-vl:free': 1_000_000,
+  'nvidia/nemotron-3-ultra-550b-a55b:free': 1_000_000,
+  // OpenRouter：DeepSeek V4 系列声明 1,048,576（1M tokens）
+  'deepseek/deepseek-v4-pro-0813': 1_048_576,
+  'deepseek/deepseek-v4.1-flash-1017': 1_048_576,
 }
 
 export const contextWindowOf = (model: string): number => CONTEXT_WINDOWS[model] ?? 200_000
