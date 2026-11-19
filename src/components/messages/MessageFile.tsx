@@ -4,6 +4,7 @@ import { useTranslate } from '../../i18n/index.js'
 import { useUploads } from '../../services/attachments.js'
 import { loadFile } from '../../services/chat/db.js'
 import type { FileAttachment } from '../../services/chat/types.js'
+import { looksLikeImageName } from '../../utils/image.js'
 import { IconPhotoErrorFill20, IconRefreshOutline16 } from '../base/icons.js'
 import { Tooltip } from '../base/Tooltip.js'
 import { FileCard } from '../files/FileCard.js'
@@ -66,7 +67,9 @@ export const MessageFile = ({
 
   const retry = retryable ? onRetry : null
 
-  if (file.isImage && url !== null) {
+  // 归档或旧数据可能漏了 isImage 标记：名字像图片、本地原件也在，就按图片渲染
+  const looksLikeImage = file.isImage || looksLikeImageName(file.name)
+  if (looksLikeImage && url !== null) {
     const preview = url ? (
       failedUrl === url ? (
         <span className={styles.failedIcon} role="img" aria-label={file.name}>

@@ -13,6 +13,7 @@ import type {
   UserMessage,
 } from '../types.js'
 import { fail } from './errors.js'
+import { looksLikeImageName } from '../../../utils/image.js'
 import type { ChatMessage, FileEntry, Fragment, SessionFile } from './format.js'
 import { sessionFilesDir } from './paths.js'
 
@@ -38,7 +39,8 @@ const toFile = (file: FileEntry): FileAttachment => ({
   serverId: null,
   name: file.file_name,
   size: file.file_size,
-  isImage: file.is_image,
+  // 归档没写 is_image 或写错时按文件名兜底，避免图片显示成文件卡片
+  isImage: file.is_image || looksLikeImageName(file.file_name),
   // 图片身份来自归档；原件随后从 ZIP 读取后补充具体 MIME。
   mimeType: '',
 })

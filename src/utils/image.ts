@@ -16,6 +16,11 @@ const JPEG_QUALITY = 0.9
 export const isSupportedImageType = (mimeType: string): boolean =>
   SUPPORTED_TYPES.has(mimeType.toLowerCase())
 
+/** 按扩展名判断是不是图片：归档或旧数据缺 isImage 标记、又拿不到 MIME 时兜底 */
+const IMAGE_NAME = /\.(png|jpe?g|gif|webp|bmp|tiff?|avif|svgz?|ico|heic|heif)$/i
+
+export const looksLikeImageName = (name: string): boolean => IMAGE_NAME.test(name)
+
 const decode = async (file: File): Promise<ImageBitmap | HTMLImageElement | null> => {
   if (typeof createImageBitmap === 'function') {
     try {
@@ -56,11 +61,17 @@ const getExt = (name: string): string => {
  */
 export const prepareImageFile = async (file: File): Promise<File | null> => {
   const type = (file.type || '').toLowerCase()
-  const isJpeg = type === 'image/jpeg' || getExt(file.name) === 'jpg' || getExt(file.name) === 'jpeg'
+  const ext = getExt(file.name)
+  const isJpeg = type === 'image/jpeg' || ext === 'jpg' || ext === 'jpeg'
+  // 部分来源（剪贴板、安卓文件选择器、重命名过的文件）给不出 MIME，
+  // 只按 type 判断会让 gif/png/webp 走进 canvas 转码，动图因此丢帧甚至解码失败。
+  const isGif = type === 'image/gif' || ext === 'gif'
+  const isPng = type === 'image/png' || ext === 'png'
+  const isWebp = type === 'image/webp' || ext === 'webp'
   // DeepSeek 按「文件内容」而非扩展名判断格式：iPhone 照片常是 CMYK、渐进式或 HEIC
   // 伪装成 .jpg，原样上传会在发消息时被判「unsupported image」。因此 JPEG 一律重编码。
   // PNG/GIF/WebP 本身格式固定，原样保留以免破坏动画与透明通道。
-  if (!isJpeg && isSupportedImageType(type) && file.size <= MAX_BYTES) {
+  if (!isJpeg && (isGif || isPng || isWebp) && file.size <= MAX_BYTES) {
     return file
   }
   const source = await decode(file)
