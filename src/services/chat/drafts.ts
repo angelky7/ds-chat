@@ -7,12 +7,14 @@ import {
   cancelUpload,
   getExtension,
   isImage,
+  notifyUploadNotice,
   resolveMimeType,
   uploadAttachment,
   useUploads,
   validateFiles,
   type UploadTask,
 } from '../attachments.js'
+import { getUploadErrorInfo, isRetryableApiError } from '../api/errors.js'
 import { extractDocumentText } from '../extract.js'
 import type { FileAttachment } from './types.js'
 
@@ -65,7 +67,14 @@ export const snapshotDraft = (sessionId: string | null): Draft => {
   return { text: draft.text, attachments: [...draft.attachments] }
 }
 
-const upload = (attachment: DraftAttachment, apiKey: string) => {
+/**
+ * 上传失败后是否可以改走本地解析：服务端繁忙、超时、网络中断，以及服务端
+ * 两种解析方式都判失败的情况。格式/大小/鉴权类错误重试无用，也不该兜底。
+ */
+const canFallbackToLocal = (error: unknown): boolean =>
+  isRetryableApiError(error) || getUploadErrorInfo(error)?.code === 'parseFailed'
+
+const upload = (sessionId: string | null, attachment: DraftAttachment, apiKey: string) => {
   // 上传任务负责记录错误，输入框的附件卡片展示失败及重试入口。
   void uploadAttachment(
     apiKey,
@@ -73,11 +82,23 @@ const upload = (attachment: DraftAttachment, apiKey: string) => {
     attachment.file,
     attachment.file.name,
     attachment.isImage
-  ).catch(() => {})
+  ).catch((error: unknown) => {
+    // 官方解析服务不可用时，改在浏览器里把文档读成文字随提问发出，
+    // 否则用户只能干等服务器不忙 —— 这条路完全不经过服务端解析。
+    if (attachment.isImage || !canFallbackToLocal(error)) {
+      return
+    }
+    extract(sessionId, attachment, true)
+  })
 }
 
 /** 把解析出的文字写回草稿附件；同一附件 id 可能被重试覆盖多次 */
-const setAttachmentText = (sessionId: string | null, id: string, text: string) =>
+const setAttachmentText = (
+  sessionId: string | null,
+  id: string,
+  text: string,
+  markLocal = false
+) =>
   useDrafts.setState((state) => {
     const draft = state.drafts.get(sessionId)
     if (!draft?.attachments.some((item) => item.id === id)) {
@@ -86,7 +107,9 @@ const setAttachmentText = (sessionId: string | null, id: string, text: string) =
     const drafts = new Map(state.drafts)
     drafts.set(sessionId, {
       ...draft,
-      attachments: draft.attachments.map((item) => (item.id === id ? { ...item, text } : item)),
+      attachments: draft.attachments.map((item) =>
+        item.id === id ? { ...item, text, ...(markLocal ? { local: true } : {}) } : item
+      ),
     })
     return { drafts }
   })
@@ -94,19 +117,23 @@ const setAttachmentText = (sessionId: string | null, id: string, text: string) =
 /**
  * 内联文档的本地解析走上传任务的状态位：卡片显示「解析中」，失败可重试。
  * 成功后清掉任务（卡片回到就绪态），文字保存在草稿附件上。
+ * markLocal 时同时把附件标成本地附件：即使服务商有 Files API，这条也按文本发送。
  */
-const extract = (sessionId: string | null, attachment: DraftAttachment) => {
+const extract = (sessionId: string | null, attachment: DraftAttachment, markLocal = false) => {
   useUploads.setState((state) => ({
     tasks: { ...state.tasks, [attachment.id]: { status: 'extracting' } },
   }))
   void extractDocumentText(attachment.file)
     .then(({ text }) => {
-      setAttachmentText(sessionId, attachment.id, text)
+      setAttachmentText(sessionId, attachment.id, text, markLocal)
       useUploads.setState((state) => ({
         tasks: Object.fromEntries(
           Object.entries(state.tasks).filter(([key]) => key !== attachment.id)
         ),
       }))
+      if (markLocal) {
+        notifyUploadNotice({ key: 'uploadFellBackToLocal' })
+      }
     })
     .catch((error: TranslationMessage) => {
       useUploads.setState((state) => ({
@@ -164,7 +191,7 @@ export const addDraftFiles = async (
       attachments: [...draft.attachments, ...added],
     }))
     if (!local) {
-      added.forEach((attachment) => upload(attachment, apiKey))
+      added.forEach((attachment) => upload(sessionId, attachment, apiKey))
     } else {
       // 内联模式没有 Files API：文档在本地抽文字，图片直接就绪
       added.filter((attachment) => !attachment.isImage).forEach((attachment) => {
@@ -193,7 +220,7 @@ export const retryDraftAttachment = (
     }
     return
   }
-  upload(attachment, apiKey)
+  upload(sessionId, attachment, apiKey)
 }
 
 /**
@@ -237,6 +264,20 @@ export const prepareDraftMessage = (
         size: attachment.file.size,
         isImage: true,
         mimeType,
+        blob: attachment.file,
+      })
+      continue
+    }
+    // 服务端解析失败后改成本地解析的文档：即使服务商有 Files API，也按文本发送
+    if (attachment.local && !attachment.isImage && attachment.text?.trim()) {
+      files.push({
+        id: attachment.id,
+        serverId: '',
+        name: attachment.file.name,
+        size: attachment.file.size,
+        isImage: false,
+        mimeType,
+        text: attachment.text,
         blob: attachment.file,
       })
       continue
@@ -336,7 +377,7 @@ export const loadMessageDraft = async (
       }))
     } else if (!inline) {
       // 当前服务商走 Files API 但这条附件没有 file_id：按新附件重新上传
-      upload(attachment, apiKey)
+      upload(sessionId, attachment, apiKey)
     } else if (!file.isImage && !attachment.text?.trim()) {
       // 内联模式下的文档缺少解析结果（例如从归档导入）：重新在本地抽文字
       extract(sessionId, attachment)

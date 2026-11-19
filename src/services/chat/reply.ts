@@ -69,14 +69,24 @@ const toFileBlocks = (
       }
       return []
     }
-    return serverId
-      ? [
-          {
-            type: isImage ? 'image' : 'document',
-            source: { type: 'file', file_id: serverId },
-          },
-        ]
-      : []
+    if (serverId) {
+      return [
+        {
+          type: isImage ? 'image' : 'document',
+          source: { type: 'file', file_id: serverId },
+        },
+      ]
+    }
+    // 服务端解析不可用时改在本地读出的文字：直接按文本块发送，内容不至于丢掉
+    if (!isImage && text?.trim()) {
+      return [
+        {
+          type: 'text',
+          text: `<document name="${name.replace(/"/g, '')}">\n${text.trim()}\n</document>`,
+        },
+      ]
+    }
+    return []
   })
 
 const toReplyBlock = (block: OutputBlockStart, now: number): ReplyBlock | null => {

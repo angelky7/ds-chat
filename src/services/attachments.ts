@@ -106,6 +106,13 @@ export const onUploadNotice = (listener: NoticeListener) => {
   }
 }
 
+/** 由其它模块（如本地解析兜底）主动推一条上传相关提示 */
+export const notifyUploadNotice = (notice: LinkedMessage) => {
+  for (const listener of noticeListeners) {
+    listener(notice)
+  }
+}
+
 /** 删除已上传文件的接口文档 */
 const DELETE_FILE_DOCS_URL = 'https://api-docs.deepseek.com/api/delete-file'
 

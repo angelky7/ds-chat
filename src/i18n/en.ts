@@ -408,6 +408,7 @@ export const en = {
   uploadServerBusy: 'Server busy',
   uploadTimeout: 'Upload timed out',
   uploadDowngradedToText: 'Server was busy, re-uploaded as text only: figures in this document will not reach the model',
+  uploadFellBackToLocal: 'DeepSeek parsing was unavailable, so the text was read on this device and sent with your message: figures in this document will not reach the model',
   uploadParseFailed: 'Parsing failed',
   uploadParseFailedHint: 'Could not parse the document. Make sure it is not encrypted or damaged and the extension matches its real format. Complex layouts are retried with plain-text parsing.',
   uploadExtractEmpty: 'No readable text found — the file may be a scan or a legacy binary format',
