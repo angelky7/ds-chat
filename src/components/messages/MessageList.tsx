@@ -9,6 +9,7 @@ import { selectMessageVersion, useChatStore } from '../../services/chat/store.js
 import type { Session } from '../../services/chat/types.js'
 import { closeSearchPanel } from '../search/searchPanelState.js'
 import { AssistantMessage } from './AssistantMessage.js'
+import { RoundOutline } from './RoundOutline.js'
 import { ScrollToBottomContext } from './scrollContext.js'
 import { UserMessage } from './UserMessage.js'
 import type { Message } from '../../services/chat/types.js'
@@ -191,6 +192,7 @@ export const MessageList = ({
           </div>
         </div>
         {footer}
+        <RoundOutline sessionId={session.id} messages={messages} />
       </div>
     </ScrollToBottomContext.Provider>
   )

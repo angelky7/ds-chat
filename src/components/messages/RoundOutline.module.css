@@ -1,0 +1,113 @@
+/* 右侧轮次导航：收起时只有一个半透明的条纹按钮，展开后是浮层列表 */
+.root {
+  position: fixed;
+  top: 50%;
+  right: 14px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transform: translateY(-50%);
+}
+
+.toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 50%;
+  background-color: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.root:hover .toggle,
+.expanded .toggle {
+  opacity: 1;
+}
+
+.toggle span {
+  width: 12px;
+  height: 1.5px;
+  border-radius: 1px;
+  background-color: currentColor;
+}
+
+.expanded .toggle span:nth-child(2) {
+  width: 8px;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 208px;
+  max-height: 58vh;
+  padding: 6px;
+  overflow-y: auto;
+  border-radius: 16px;
+  background-color: var(--dsw-alias-bg-layer-2);
+  box-shadow:
+    inset 0 0 0 1px var(--dsw-alias-border-inverted),
+    0 0 1px 0 rgba(0, 0, 0, 0.2),
+    0 12px 32px 0 rgba(0, 0, 0, 0.08);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 10px;
+  background-color: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease-in-out;
+}
+
+.item:hover {
+  background-color: var(--dsw-alias-interactive-bg-hover);
+}
+
+.active {
+  color: var(--dsw-alias-brand-text);
+}
+
+.label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.active .label {
+  font-weight: 500;
+}
+
+/* 当前轮右侧的短横指示 */
+.bar {
+  flex-shrink: 0;
+  width: 12px;
+  height: 2px;
+  border-radius: 1px;
+  background-color: currentColor;
+  opacity: 0;
+}
+
+.active .bar {
+  opacity: 1;
+}

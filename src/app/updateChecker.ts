@@ -10,6 +10,28 @@ const currentVersion = (): string =>
 /** 入口 HTML 与当前页面同源同目录；子路径部署时也能取到 */
 const entryUrl = (): string => new URL('index.html', window.location.href).href
 
+/**
+ * 已经提示过的新版本号：同一次更新只提醒一次。
+ * 用户没点刷新也不会每次进来都看到横幅（横幅不点就一直在，体验很差）。
+ */
+const NOTIFIED_KEY = 'chat-demo:update-notified'
+
+const readNotified = (): string => {
+  try {
+    return localStorage.getItem(NOTIFIED_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+const writeNotified = (version: string) => {
+  try {
+    localStorage.setItem(NOTIFIED_KEY, version)
+  } catch {
+    // 隐私模式下写不进去：退化为每次提示，不影响功能
+  }
+}
+
 export const checkForUpdate = (onUpdate: () => void): (() => void) => {
   let cancelled = false
 
@@ -29,7 +51,9 @@ export const checkForUpdate = (onUpdate: () => void): (() => void) => {
         /<meta[^>]*application-version[^>]*>/i
       )?.[0]
       const latest = meta?.match(/content=["']([^"']*)["']/i)?.[1] ?? ''
-      if (!cancelled && latest && latest !== current) {
+      // 同一版本只提示一次：记下版本号后再通知界面
+      if (!cancelled && latest && latest !== current && readNotified() !== latest) {
+        writeNotified(latest)
         onUpdate()
       }
     } catch {

@@ -191,6 +191,8 @@ export const en = {
     'If the UI still looks outdated, the browser is likely serving a cached page. A force refresh bypasses the cache and downloads the latest version. Your conversations are stored locally and will not be lost.',
   settingsVersionRefreshAction: 'Force refresh',
   updateAvailable: 'A new version is available. Tap to reload',
+  roundOutline: 'Jump to a round',
+  roundOutlineAttachment: '(attachment)',
   settingsBack: 'Back',
   settingsGroupApp: 'App',
   settingsGroupChat: 'Chat',
