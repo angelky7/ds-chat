@@ -66,11 +66,26 @@ export const validateFiles = (files: File[], currentCount: number): TranslationM
   return null
 }
 
+/** 上传超时：官方规定上传 120s + 解析 120s，同步等待，这里留足余量 */
+const UPLOAD_TIMEOUT_MS = 300_000
+/** 服务端繁忙后重试前的等待，避开瞬时高峰 */
+const RETRY_DELAY_MS = 2000
+
+/** 超时不是服务端返回的错误，单独标记：文案与「上传失败」不同，且值得重试 */
+class UploadTimeoutError extends Error {
+  constructor() {
+    super('upload timeout')
+  }
+}
+
 /**
  * 上传失败在附件上显示的文案：与设计稿状态对应的用具体原因，其余统一「上传失败」。
  * 服务端原文多为英文且较长，不直接展示。
  */
 export const describeUploadError = (error: unknown): TranslationMessage => {
+  if (error instanceof UploadTimeoutError) {
+    return { key: 'uploadTimeout' }
+  }
   if (classifyApiError(error) === 'serverBusy') {
     return { key: 'uploadServerBusy' }
   }
@@ -125,7 +140,14 @@ const next = () => {
   }
 }
 
-/** 排队上传，最多同时上传 MAX_CONCURRENT 个；排队期间中止的任务不会发出请求 */
+/**
+ * 排队上传，最多同时上传 MAX_CONCURRENT 个；排队期间中止的任务不会发出请求。
+ *
+ * 官方 Files API 在同一个请求里同步等解析完成（上传 120s + 解析 120s），
+ * 因此每次尝试都带自己的超时，并且在「服务端繁忙 / 超时」时自动重试一次：
+ * 版面解析（rich）最重、最容易撞上繁忙，重试时改用纯文本解析（text），
+ * 代价是文档里的图不会发给模型，成功后提示一次。
+ */
 const enqueueUpload = (
   apiKey: string,
   file: Blob,
@@ -139,19 +161,62 @@ const enqueueUpload = (
         reject(signal.reason)
         return
       }
-      try {
-        const body = file instanceof File ? file : new File([file], name, { type: file.type })
-        const purpose = getUploadPurpose(name, isImage, useSettings.getState().parseDepth)
+      const body = file instanceof File ? file : new File([file], name, { type: file.type })
+      const purpose = getUploadPurpose(name, isImage, useSettings.getState().parseDepth)
+
+      /** 单次尝试：合并外部取消与本次超时，超时单独标记以便走重试 */
+      const attempt = async (parsePurpose: FilePurpose | null) => {
+        const controller = new AbortController()
+        let timedOut = false
+        const onAbort = () => controller.abort(signal.reason)
+        signal.addEventListener('abort', onAbort, { once: true })
+        const timer = setTimeout(() => {
+          timedOut = true
+          controller.abort()
+        }, UPLOAD_TIMEOUT_MS)
         try {
-          resolve((await uploadFile(apiKey, body, purpose, signal)).id)
+          return await uploadFile(apiKey, body, parsePurpose, controller.signal)
         } catch (error) {
-          // 版面解析会额外裁切文档里的图片，个别 docx/ppt 会因此解析失败；
-          // 自动退回纯文本解析，仍失败才把原始错误交给界面提示。
-          if (purpose === 'rich_layout_recognition' && getUploadErrorInfo(error)?.code === 'parseFailed') {
-            resolve((await uploadFile(apiKey, body, 'text_recognition', signal)).id)
-          } else {
+          throw timedOut && !signal.aborted ? new UploadTimeoutError() : error
+        } finally {
+          clearTimeout(timer)
+          signal.removeEventListener('abort', onAbort)
+        }
+      }
+
+      try {
+        try {
+          resolve((await attempt(purpose)).id)
+        } catch (error) {
+          if (signal.aborted) {
             throw error
           }
+          // 版面解析会额外裁切文档里的图片，个别 docx/ppt 会因此解析失败；
+          // 自动退回纯文本解析，仍失败才把原始错误交给界面提示。
+          if (
+            purpose === 'rich_layout_recognition' &&
+            getUploadErrorInfo(error)?.code === 'parseFailed'
+          ) {
+            resolve((await attempt('text_recognition')).id)
+            return
+          }
+          // 服务端繁忙或超时：等一会儿重试一次；版面解析改用更轻的纯文本解析
+          if (isRetryableApiError(error)) {
+            await new Promise((done) => setTimeout(done, RETRY_DELAY_MS))
+            if (signal.aborted) {
+              throw error
+            }
+            const retryPurpose = purpose === 'rich_layout_recognition' ? 'text_recognition' : purpose
+            const uploaded = await attempt(retryPurpose)
+            if (retryPurpose !== purpose) {
+              for (const listener of noticeListeners) {
+                listener({ key: 'uploadDowngradedToText' })
+              }
+            }
+            resolve(uploaded.id)
+            return
+          }
+          throw error
         }
       } catch (error) {
         reject(error)

@@ -380,6 +380,8 @@ export const zh = {
   uploadFileStatusUploading: '上传中...',
   uploadFileStatusParsing: '解析中...',
   uploadServerBusy: '服务器繁忙',
+  uploadTimeout: '上传超时',
+  uploadDowngradedToText: '服务端繁忙，已改为只读文字重新上传：这次文档里的图表不会发给模型',
   uploadParseFailed: '解析失败',
   uploadParseFailedHint: '文档解析失败，请确认文件未加密、未损坏且扩展名与真实格式一致；复杂排版会自动改用纯文本解析重试。',
   uploadExtractEmpty: '未能读出文件内容，可能是扫描件或旧版二进制格式',

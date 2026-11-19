@@ -406,6 +406,8 @@ export const en = {
   uploadFileStatusUploading: 'Uploading...',
   uploadFileStatusParsing: 'Parsing...',
   uploadServerBusy: 'Server busy',
+  uploadTimeout: 'Upload timed out',
+  uploadDowngradedToText: 'Server was busy, re-uploaded as text only: figures in this document will not reach the model',
   uploadParseFailed: 'Parsing failed',
   uploadParseFailedHint: 'Could not parse the document. Make sure it is not encrypted or damaged and the extension matches its real format. Complex layouts are retried with plain-text parsing.',
   uploadExtractEmpty: 'No readable text found — the file may be a scan or a legacy binary format',
