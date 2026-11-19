@@ -33,6 +33,8 @@ import { FileModeSetting } from './FileModeSetting.js'
 import { LocationSelects } from './LocationSetting.js'
 import { PromptsSettings } from './PromptsSettings.js'
 import { ProviderSettings } from './ProviderSettings.js'
+import { ForceRefreshDialog, useVersionTap } from './VersionRefresh.js'
+import refreshStyles from './VersionRefresh.module.css'
 import { TemperatureSlider } from './TemperatureSlider.js'
 import { closeSettings, useSettingsDialog, type SettingsSection } from './settingsDialogState.js'
 import styles from './MobileSettings.module.css'
@@ -169,6 +171,7 @@ export const MobileSettings = () => {
   const keepRefusedAnswer = useSettings((state) => state.keepRefusedAnswer)
   const temperature = useSettings((state) => state.temperature)
   const version = appVersion()
+  const versionTap = useVersionTap()
 
   const themeLabel =
     themePreference === 'light'
@@ -298,10 +301,12 @@ export const MobileSettings = () => {
             <Row
               icon={<IconInfoOutline16 />}
               label={t('settingsVersion')}
-              value={version}
+              trailing={<span className={refreshStyles.tap}>{version}</span>}
+              onClick={versionTap.onTap}
             />
           </Group>
         ) : null}
+        {versionTap.open ? <ForceRefreshDialog onClose={versionTap.close} /> : null}
       </>
     ) : page === 'language' ? (
       <>

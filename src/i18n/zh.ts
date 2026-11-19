@@ -159,6 +159,10 @@ export const zh = {
   settingsLocationRegion: '请选择国家或地区',
   settingsLanguageRegion: '语言与地区',
   settingsVersion: '版本',
+  settingsVersionRefreshTitle: '检查更新',
+  settingsVersionRefreshBody:
+    '如果界面还是旧版本，通常是浏览器缓存了旧页面。强制刷新会绕过缓存、重新下载最新版本；你的对话都存在本机，不会丢失。',
+  settingsVersionRefreshAction: '强制刷新',
   updateAvailable: '发现新版本，点此刷新后使用',
   settingsBack: '返回',
   settingsGroupApp: '应用',

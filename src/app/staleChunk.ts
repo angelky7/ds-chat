@@ -1,4 +1,5 @@
 import { showToast } from '../components/base/toastState.js'
+import { forceReload } from './reload.js'
 
 /**
  * 发版后旧页面继续引用的异步 chunk 已被新构建替换（文件名带哈希，旧文件 404），
@@ -41,6 +42,6 @@ export const installStaleChunkGuard = () => {
     } catch {
       // 存不进去也能刷新，只是失去冷却保护
     }
-    window.location.reload()
+    forceReload()
   })
 }

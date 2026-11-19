@@ -1,0 +1,19 @@
+/* 版本号上的隐藏手势：长得像普通文本，不提示可点击 */
+.tap {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--dsw-alias-label-tertiary);
+  white-space: nowrap;
+  cursor: default;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.body {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--dsw-alias-label-primary);
+}

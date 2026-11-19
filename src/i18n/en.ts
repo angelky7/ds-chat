@@ -171,6 +171,10 @@ export const en = {
   settingsLocationRegion: 'Select country or region',
   settingsLanguageRegion: 'Language & region',
   settingsVersion: 'Version',
+  settingsVersionRefreshTitle: 'Check for updates',
+  settingsVersionRefreshBody:
+    'If the UI still looks outdated, the browser is likely serving a cached page. A force refresh bypasses the cache and downloads the latest version. Your conversations are stored locally and will not be lost.',
+  settingsVersionRefreshAction: 'Force refresh',
   updateAvailable: 'A new version is available. Tap to reload',
   settingsBack: 'Back',
   settingsGroupApp: 'App',

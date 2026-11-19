@@ -35,6 +35,8 @@ import { ProviderSettings } from './ProviderSettings.js'
 import { SettingCell } from './SettingCell.js'
 import { TemperatureSlider } from './TemperatureSlider.js'
 import { closeSettings, useSettingsDialog, type SettingsSection } from './settingsDialogState.js'
+import { ForceRefreshDialog, useVersionTap } from './VersionRefresh.js'
+import refreshStyles from './VersionRefresh.module.css'
 import styles from './Settings.module.css'
 
 /**
@@ -257,18 +259,26 @@ const KeepRefusedSetting = () => {
   )
 }
 
-/** 版本号：桌面端「通用设置」末尾展示，与移动端「关于」分组一致。 */
+/** 版本号：桌面端「通用设置」末尾展示，与移动端「关于」分组一致。连点 5 次可强制刷新。 */
 const VersionSetting = () => {
   const t = useTranslate()
   const version = appVersion()
+  const { open, onTap, close } = useVersionTap()
   if (!version) {
     return null
   }
   return (
-    <SettingCell
-      label={t('settingsVersion')}
-      status={null}
-      action={<span className={styles.versionValue}>{version}</span>}
-    />
+    <>
+      <SettingCell
+        label={t('settingsVersion')}
+        status={null}
+        action={
+          <button type="button" className={refreshStyles.tap} onClick={onTap}>
+            {version}
+          </button>
+        }
+      />
+      {open ? <ForceRefreshDialog onClose={close} /> : null}
+    </>
   )
 }
