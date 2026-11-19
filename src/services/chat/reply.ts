@@ -30,10 +30,11 @@ export type ImageResolver = (fileId: string) => InlineImage | undefined
 export const RAW_SEARCH_PROMPT = /<search_results>[\s\S]*?CITATION FORMAT[\s\S]*?<\/search_results>/gi
 
 /**
- * 文件按 Files API 的 file_id（附件的 serverId）引用：图片用 image 块，其余用 document 块。
- * 发送前 streamReply 会先补齐 serverId；仍为 null 的是本地没有原件的附件，不进入请求。
- * 传入 images 时不使用 Files API：图片改为内联 base64，
- * 带本地解析文字（text）的文档注入 <document> 文本块，其余附件不进入请求。
+ * 每个附件按「服务端优先、本兜底」转成内容块：
+ * - 图片：有 serverId 用 image/file_id，否则用 images 解析器读原件走 base64 内联
+ * - 文档：有 serverId 用 document/file_id（保留图文混排），否则把本地解析出的文字
+ *   包成 <document> 文本块；两者都没有的附件不进入请求。
+ * 传 images 的是「不上传或上传失败」的场景，本地没有原件的附件仍会被跳过。
  */
 const toFileBlocks = (
   files: FileAttachment[],
@@ -44,41 +45,27 @@ const toFileBlocks = (
     | Base64ImageBlockParam
     | TextBlockParam
   )[] => {
-    if (images) {
-      const inline = isImage ? images(id) : undefined
-      if (inline) {
-        return [
-          {
-            type: 'image',
-            source: {
-              type: 'base64',
-              media_type: inline.mediaType,
-              data: inline.data,
+    if (isImage) {
+      // 有 file_id 就复用服务端文件（多轮不重复上传）；上传失败的图片走 base64 内联
+      if (serverId) {
+        return [{ type: 'image', source: { type: 'file', file_id: serverId } }]
+      }
+      const inline = images?.(id)
+      return inline
+        ? [
+            {
+              type: 'image',
+              source: { type: 'base64', media_type: inline.mediaType, data: inline.data },
             },
-          },
-        ]
-      }
-      if (!isImage && text?.trim()) {
-        // 文件名进标签属性，引号去掉避免破坏结构；正文原样注入
-        return [
-          {
-            type: 'text',
-            text: `<document name="${name.replace(/"/g, '')}">\n${text.trim()}\n</document>`,
-          },
-        ]
-      }
-      return []
+          ]
+        : []
     }
+    // 上传成功时用服务端 file_id（保留图文混排）；否则按本地读出的文字发送
     if (serverId) {
-      return [
-        {
-          type: isImage ? 'image' : 'document',
-          source: { type: 'file', file_id: serverId },
-        },
-      ]
+      return [{ type: 'document', source: { type: 'file', file_id: serverId } }]
     }
-    // 服务端解析不可用时改在本地读出的文字：直接按文本块发送，内容不至于丢掉
-    if (!isImage && text?.trim()) {
+    // 文件名进标签属性，引号去掉避免破坏结构；正文原样注入
+    if (text?.trim()) {
       return [
         {
           type: 'text',

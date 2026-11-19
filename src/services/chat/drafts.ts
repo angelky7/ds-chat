@@ -74,6 +74,25 @@ export const snapshotDraft = (sessionId: string | null): Draft => {
 const canFallbackToLocal = (error: unknown): boolean =>
   isRetryableApiError(error) || getUploadErrorInfo(error)?.code === 'parseFailed'
 
+/**
+ * 图片上传失败（繁忙、超时、断网）后改走内联：清掉失败的上传任务，
+ * 把附件标成本地，发送时由 images 解析器读原件按 base64 放进请求。
+ */
+const markLocalImage = (sessionId: string | null, attachment: DraftAttachment) => {
+  updateDraft(sessionId, (draft) => ({
+    ...draft,
+    attachments: draft.attachments.map((item) =>
+      item.id === attachment.id ? { ...item, local: true } : item
+    ),
+  }))
+  useUploads.setState((state) => ({
+    tasks: Object.fromEntries(
+      Object.entries(state.tasks).filter(([key]) => key !== attachment.id)
+    ),
+  }))
+  notifyUploadNotice({ key: 'uploadImageFellBackToLocal' })
+}
+
 const upload = (sessionId: string | null, attachment: DraftAttachment, apiKey: string) => {
   // 上传任务负责记录错误，输入框的附件卡片展示失败及重试入口。
   void uploadAttachment(
@@ -83,11 +102,16 @@ const upload = (sessionId: string | null, attachment: DraftAttachment, apiKey: s
     attachment.file.name,
     attachment.isImage
   ).catch((error: unknown) => {
-    // 官方解析服务不可用时，改在浏览器里把文档读成文字随提问发出，
-    // 否则用户只能干等服务器不忙 —— 这条路完全不经过服务端解析。
-    if (attachment.isImage || !canFallbackToLocal(error)) {
+    // 格式/大小/鉴权类错误重试无用，也不该兜底
+    if (!canFallbackToLocal(error)) {
       return
     }
+    // 图片：官方支持 base64 内联，读本地原件直接随消息发送，完全绕开 Files API
+    if (attachment.isImage) {
+      markLocalImage(sessionId, attachment)
+      return
+    }
+    // 文档：在浏览器里把文档读成文字随提问发出，否则用户只能干等服务器不忙
     extract(sessionId, attachment, true)
   })
 }
@@ -279,6 +303,21 @@ export const prepareDraftMessage = (
         mimeType,
         text: attachment.text,
         blob: attachment.file,
+        local: true,
+      })
+      continue
+    }
+    // 图片上传失败后改走内联：没有 serverId，发送时由 images 解析器读原件转 base64
+    if (attachment.local && attachment.isImage) {
+      files.push({
+        id: attachment.id,
+        serverId: '',
+        name: attachment.file.name,
+        size: attachment.file.size,
+        isImage: true,
+        mimeType,
+        blob: attachment.file,
+        local: true,
       })
       continue
     }

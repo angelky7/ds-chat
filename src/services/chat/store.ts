@@ -1150,6 +1150,10 @@ const ensureServerId = async (file: FileAttachment): Promise<string | null> => {
   if (file.serverId) {
     return file.serverId
   }
+  // 上传失败后改走内联的附件：再传一次只会重复撞上同一个失败
+  if (file.local) {
+    return null
+  }
   const task = useUploads.getState().tasks[file.id]
   if (task?.status === 'done') {
     return task.serverId
@@ -1291,7 +1295,7 @@ const prepareFiles = async (sessionId: string, request: Request, signal: AbortSi
   // 不用 toReversed：旧版 iOS Safari 没有这个方法，补传历史附件时会抛错。
   for (const [user] of [...visibleRounds].reverse()) {
     for (const file of user.files) {
-      if (!file.serverId && !serverIds.has(file.id) && !pending.has(file.id)) {
+      if (!file.serverId && !file.local && !serverIds.has(file.id) && !pending.has(file.id)) {
         pending.set(file.id, file)
       }
     }
@@ -1527,8 +1531,12 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
         persist(sessionId)
         const model = resolveModel(initial.model, provider)
         // 非 Flash / 非 DeepSeek 模型没有 Files API；不支持视觉时连内联图片也不发。
+        // 有 Files API 的服务商平时只用 file_id，仅当有图片上传失败（没有 serverId）时才读本地原件内联。
+        const needsInline = collectFiles(prepared).some((file) => file.isImage && !file.serverId)
         const images = provider.capabilities.files
-          ? undefined
+          ? needsInline
+            ? await inlineImages(prepared, controller.signal, request.blobs)
+            : undefined
           : provider.capabilities.images
             ? await inlineImages(prepared, controller.signal, request.blobs)
             : () => undefined
