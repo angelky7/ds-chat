@@ -4,6 +4,7 @@ import { uploadFile } from './api/client.js'
 import { classifyApiError, getUploadErrorInfo, isRetryableApiError } from './api/errors.js'
 import type { FilePurpose } from './api/types.js'
 import { useSettings, type ParseDepth } from './settings.js'
+import { activeProvider } from './providers.js'
 import { ACCEPT_FILE_EXTS } from './uploadExts.js'
 
 /** 允许上传的扩展名，按扩展名白名单过滤，清单见 uploadExts.ts */
@@ -131,7 +132,8 @@ const enqueueUpload = (
   file: Blob,
   name: string,
   isImage: boolean,
-  signal: AbortSignal
+  signal: AbortSignal,
+  baseUrl: string
 ) =>
   new Promise<string>((resolve, reject) => {
     queue.push(async () => {
@@ -143,12 +145,12 @@ const enqueueUpload = (
         const body = file instanceof File ? file : new File([file], name, { type: file.type })
         const purpose = getUploadPurpose(name, isImage, useSettings.getState().parseDepth)
         try {
-          resolve((await uploadFile(apiKey, body, purpose, signal)).id)
+          resolve((await uploadFile(apiKey, body, purpose, signal, baseUrl)).id)
         } catch (error) {
           // 版面解析会额外裁切文档里的图片，个别 docx/ppt 会因此解析失败；
           // 自动退回纯文本解析，仍失败才把原始错误交给界面提示。
           if (purpose === 'rich_layout_recognition' && getUploadErrorInfo(error)?.code === 'parseFailed') {
-            resolve((await uploadFile(apiKey, body, 'text_recognition', signal)).id)
+            resolve((await uploadFile(apiKey, body, 'text_recognition', signal, baseUrl)).id)
           } else {
             throw error
           }
@@ -198,7 +200,9 @@ export const uploadAttachment = (
   }
   const controller = new AbortController()
   setTask(id, { status: 'uploading' })
-  const promise = enqueueUpload(apiKey, blob, name, isImage, controller.signal)
+  // 上传地址跟随当前服务商：换成中转/自建反代后，聊天和上传走同一个入口
+  const baseUrl = activeProvider().baseUrl
+  const promise = enqueueUpload(apiKey, blob, name, isImage, controller.signal, baseUrl)
     .then((serverId) => {
       setTask(id, { status: 'done', serverId })
       return serverId

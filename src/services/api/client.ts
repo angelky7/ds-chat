@@ -12,8 +12,8 @@ import type {
 } from './types.js'
 
 export { API_ORIGIN }
-/** DeepSeek 的 Anthropic 兼容接口前缀：Files API 与语音工具都只有官方提供 */
-const ANTHROPIC_BASE_URL = `${API_ORIGIN}/anthropic/v1`
+/** DeepSeek 的 Anthropic 兼容接口前缀：作为 Files API 的默认入口 */
+const ANTHROPIC_BASE_URL = `${API_ORIGIN}/anthropic`
 /** 引用 Files API 上传的图片、调用 Anthropic 兼容 Files API 时必须携带 */
 const FILES_BETA = 'files-api-2025-04-14'
 
@@ -83,12 +83,20 @@ export const request = async (url: string, init: RequestInit): Promise<Response>
   return response
 }
 
-const anthropicHeaders = (apiKey: string, beta: boolean): Record<string, string> => ({
-  // DeepSeek 兼容接口的鉴权方式，也可使用 Authorization: Bearer。
+const anthropicHeaders = (apiKey: string): Record<string, string> => ({
+  // 官方只认 x-api-key；第三方中转/自建反代有的只认 Bearer，两者同时给出。
   'x-api-key': apiKey,
+  Authorization: `Bearer ${apiKey}`,
   // Files API 和通过 file_id 引用图片时必传；纯文本聊天无需携带。
-  ...(beta ? { 'anthropic-beta': FILES_BETA } : {}),
+  'anthropic-beta': FILES_BETA,
 })
+
+/**
+ * Files API 的基地址：跟随服务商配置的 Anthropic 入口，不写死官方域名。
+ * 把 DeepSeek 的地址换成中转或自建反代后，聊天走配置地址、上传却打官方域名，
+ * 用第三方 Key 必然 401，表现就是「能聊天、一传文件就失败」。
+ */
+const filesEndpoint = (baseUrl: string) => `${baseUrl.replace(/\/+$/, '')}/v1/files`
 
 /**
  * 对话请求的鉴权头：两种写法同时给出。官方只认 x-api-key，
@@ -137,34 +145,40 @@ export const verifyApiKey = async (
 }
 
 /**
- * POST /anthropic/v1/files 上传附件（不设过期时间，会话里的历史附件一直可用）。
+ * POST {baseUrl}/v1/files 上传附件（不设过期时间，会话里的历史附件一直可用）。
  * purpose 为 null 时不传该字段（图片）；purpose 必须排在 file 之前。
+ * baseUrl 取自当前服务商，留空时回落到官方入口。
  */
 export const uploadFile = async (
   apiKey: string,
   file: File,
   purpose: FilePurpose | null,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  baseUrl: string = ANTHROPIC_BASE_URL
 ): Promise<FileObject> => {
   const form = new FormData()
   if (purpose) {
     form.append('purpose', purpose)
   }
   form.append('file', file)
-  const response = await request(`${ANTHROPIC_BASE_URL}/files`, {
+  const response = await request(filesEndpoint(baseUrl), {
     method: 'POST',
-    headers: anthropicHeaders(apiKey, true),
+    headers: anthropicHeaders(apiKey),
     body: form,
     signal,
   })
   return (await response.json()) as FileObject
 }
 
-/** DELETE /anthropic/v1/files/{file_id} */
-export const deleteFile = async (apiKey: string, fileId: string): Promise<void> => {
-  await request(`${ANTHROPIC_BASE_URL}/files/${encodeURIComponent(fileId)}`, {
+/** DELETE {baseUrl}/v1/files/{file_id} */
+export const deleteFile = async (
+  apiKey: string,
+  fileId: string,
+  baseUrl: string = ANTHROPIC_BASE_URL
+): Promise<void> => {
+  await request(`${filesEndpoint(baseUrl)}/${encodeURIComponent(fileId)}`, {
     method: 'DELETE',
-    headers: anthropicHeaders(apiKey, true),
+    headers: anthropicHeaders(apiKey),
   })
 }
 
