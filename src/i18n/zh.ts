@@ -127,6 +127,7 @@ export const zh = {
   settingsPinnedRoundsDescription:
     '固定保留开场若干轮原文，不参与压缩。开场包含重要设定时建议保留。0 表示不保留。',
   chatCompacting: '正在压缩早期上下文，为你节省 token…',
+  staleChunkReloadFailed: '页面已更新，请手动刷新（Ctrl+F5）后再试',
   chatMessageOverWindow: '这条消息太长，超过模型窗口——请拆分成多条发送，或作为文件上传后再提问',
   settingsAutoCompactFailed: '压缩未完成，建议手动压缩',
   settingsAutoCompactDone: '压缩完成，约节约了 {tokens} token',

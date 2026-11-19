@@ -136,6 +136,7 @@ export const en = {
   settingsPinnedRoundsDescription:
     'Keep the first few rounds verbatim; they never get compacted. Recommended when the opening contains important setup. 0 disables it.',
   chatCompacting: 'Compacting earlier context to save tokens…',
+  staleChunkReloadFailed: 'The app has been updated — please refresh (Ctrl+F5) and try again',
   chatMessageOverWindow:
     'This message exceeds the model window — split it into several messages, or attach it as a file and ask about it',
   settingsAutoCompactFailed: 'Compaction did not finish — try compacting manually',
