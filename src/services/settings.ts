@@ -40,10 +40,12 @@ type Settings = {
   fileResend: FileResend
   /** 文件解析深度；快速模式只提文字，专家模式走版面解析 */
   parseDepth: ParseDepth
-  /** 达到阈值时自动把早期轮次压成摘要；默认关闭，超过窗口 100% 时另有不可关的兜底压缩 */
-  autoCompact: boolean
-  /** 自动压缩的触发阈值，按窗口的百分比记（30~80）；整数存储避免浮点误差 */
+  /** 是否自定义压缩阈值；关闭时固定按默认阈值触发 */
+  customThresholdEnabled: boolean
+  /** 压缩触发阈值，按窗口的百分比记（20~90）；整数存储避免浮点误差 */
   compactThreshold: number
+  /** 固定保留开场若干轮原文不参与压缩（0~10，默认 3） */
+  pinnedRounds: number
 }
 
 /** 温度取值范围与默认值，与 DeepSeek 官方一致 */
@@ -56,22 +58,27 @@ export const CONTEXT_LIMIT_UNLIMITED = 0
 export const MIN_CONTEXT_LIMIT = 1
 export const MAX_CONTEXT_LIMIT = 50
 
-/** 自动压缩阈值：按窗口百分比，整数存储 */
+/** 压缩触发阈值：按窗口百分比，整数存储；达到阈值即压缩（永远生效，开关只决定是否自定义） */
 export const MIN_COMPACT_THRESHOLD = 20
-export const MAX_COMPACT_THRESHOLD = 100
-export const DEFAULT_COMPACT_THRESHOLD = 80
+export const MAX_COMPACT_THRESHOLD = 90
+export const DEFAULT_COMPACT_THRESHOLD = 85
+
+/** 开场保留轮数：固定原文发送、不进入摘要 */
+export const MIN_PINNED_ROUNDS = 0
+export const MAX_PINNED_ROUNDS = 10
+export const DEFAULT_PINNED_ROUNDS = 3
 
 /**
  * 处理模式预设：一次写入「高级」里的全部细项。
- * 快速面向新手：只提文字、附件只发一次、阈值 80%（尽量不压）；
- * 专家面向读文档：版面解析 + 每轮重发，阈值降到 50% 提前兜底。
- * 两种模式的轮次上限都是无限，由压缩负责兜住累积。
+ * 快速面向新手：只提文字、附件只发一次；
+ * 专家面向读文档：版面解析 + 每轮重发。
+ * 压缩永远生效（85% 触发），两种模式的轮次上限都是无限。
  */
 type FileModeValues = {
   parseDepth: ParseDepth
   fileResend: FileResend
-  autoCompact: boolean
   compactThreshold: number
+  pinnedRounds: number
   contextLimit: number
 }
 
@@ -79,15 +86,15 @@ export const FILE_MODE_PRESETS: Record<'fast' | 'expert', FileModeValues> = {
   fast: {
     parseDepth: 'text',
     fileResend: 'once',
-    autoCompact: false,
     compactThreshold: DEFAULT_COMPACT_THRESHOLD,
+    pinnedRounds: DEFAULT_PINNED_ROUNDS,
     contextLimit: CONTEXT_LIMIT_UNLIMITED,
   },
   expert: {
     parseDepth: 'layout',
     fileResend: 'every-turn',
-    autoCompact: false,
-    compactThreshold: 50,
+    compactThreshold: DEFAULT_COMPACT_THRESHOLD,
+    pinnedRounds: DEFAULT_PINNED_ROUNDS,
     contextLimit: CONTEXT_LIMIT_UNLIMITED,
   },
 }
@@ -96,8 +103,8 @@ export const FILE_MODE_PRESETS: Record<'fast' | 'expert', FileModeValues> = {
 const FILE_MODE_FIELDS = [
   'parseDepth',
   'fileResend',
-  'autoCompact',
   'compactThreshold',
+  'pinnedRounds',
   'contextLimit',
 ] as const
 
@@ -114,9 +121,9 @@ const KEYS = {
   contextLimit: 'chat-demo:context-limit',
   fileResend: 'chat-demo:file-resend',
   parseDepth: 'chat-demo:parse-depth',
-  autoCompact: 'chat-demo:auto-compact',
-  autoCompactReset: 'chat-demo:auto-compact-reset',
+  customThreshold: 'chat-demo:custom-threshold',
   compactThreshold: 'chat-demo:compact-threshold',
+  pinnedRounds: 'chat-demo:pinned-rounds',
   keepRefusedAnswer: 'chat-demo:keep-refused-answer',
 } as const
 
@@ -215,27 +222,35 @@ const initialFileResend = (): FileResend =>
 /** 默认快速模式：只提取文字，最省额度 */
 const initialParseDepth = (): ParseDepth => (read(KEYS.parseDepth) === 'layout' ? 'layout' : 'text')
 
-/** 未保存过或越界时回到 80% */
+/**
+ * 阈值收敛规则：超过 90% 收敛为 90（留出发送余量），低于 20% 收敛为 20，
+ * 非法值回退默认 85%。
+ */
 const initialCompactThreshold = (): number => {
   const raw = read(KEYS.compactThreshold)
   if (raw === null || raw.trim() === '') {
     return DEFAULT_COMPACT_THRESHOLD
   }
   const value = Math.round(Number(raw))
-  return Number.isFinite(value) && value >= MIN_COMPACT_THRESHOLD && value <= MAX_COMPACT_THRESHOLD
-    ? value
-    : DEFAULT_COMPACT_THRESHOLD
+  if (!Number.isFinite(value)) {
+    return DEFAULT_COMPACT_THRESHOLD
+  }
+  return Math.min(MAX_COMPACT_THRESHOLD, Math.max(MIN_COMPACT_THRESHOLD, value))
 }
 
-/** 见 useSettings 里 autoCompact 的迁移注释：标记写回后，用户后续的开关照常生效 */
-const initialAutoCompact = (): boolean => {
-  if (read(KEYS.autoCompactReset) !== '1') {
-    write(KEYS.autoCompactReset, '1')
-    write(KEYS.autoCompact, 'false')
-    return false
+/** 非法值回退 3 */
+const initialPinnedRounds = (): number => {
+  const raw = read(KEYS.pinnedRounds)
+  if (raw === null || raw.trim() === '') {
+    return DEFAULT_PINNED_ROUNDS
   }
-  return read(KEYS.autoCompact) === 'true'
+  const value = Math.round(Number(raw))
+  return Number.isFinite(value) && value >= MIN_PINNED_ROUNDS && value <= MAX_PINNED_ROUNDS
+    ? value
+    : DEFAULT_PINNED_ROUNDS
 }
+
+const initialCustomThresholdEnabled = (): boolean => read(KEYS.customThreshold) === 'true'
 
 export const useSettings = create<Settings>(() => ({
   locale: initialLocale(),
@@ -251,13 +266,9 @@ export const useSettings = create<Settings>(() => ({
   contextLimit: initialContextLimit(),
   fileResend: initialFileResend(),
   parseDepth: initialParseDepth(),
-  /**
-   * 一次性迁移：这一版把所有人的自动压缩强制关闭（大多数人用不上，
-   * 超窗口 100% 另有兜底压缩；确实需要的用户再手动打开并正常保存）。
-   * 迁移标记保证只执行一次，之后用户自己的开关照常生效。
-   */
-  autoCompact: initialAutoCompact(),
+  customThresholdEnabled: initialCustomThresholdEnabled(),
   compactThreshold: initialCompactThreshold(),
+  pinnedRounds: initialPinnedRounds(),
 }))
 
 export const setLocale = (locale: Locale) => {
@@ -336,9 +347,9 @@ export const setFileResend = (fileResend: FileResend) => {
   useSettings.setState({ fileResend })
 }
 
-export const setAutoCompact = (autoCompact: boolean) => {
-  write(KEYS.autoCompact, String(autoCompact))
-  useSettings.setState({ autoCompact })
+export const setCustomThresholdEnabled = (enabled: boolean) => {
+  write(KEYS.customThreshold, String(enabled))
+  useSettings.setState({ customThresholdEnabled: enabled })
 }
 
 export const setParseDepth = (parseDepth: ParseDepth) => {
@@ -346,7 +357,7 @@ export const setParseDepth = (parseDepth: ParseDepth) => {
   useSettings.setState({ parseDepth })
 }
 
-/** 阈值按整数百分比保存；越界夹到 30~80 */
+/** 阈值按整数百分比保存；越界夹到 20~90 */
 export const setCompactThreshold = (value: number) => {
   const clamped = Math.min(
     MAX_COMPACT_THRESHOLD,
@@ -354,6 +365,16 @@ export const setCompactThreshold = (value: number) => {
   )
   write(KEYS.compactThreshold, String(clamped))
   useSettings.setState({ compactThreshold: clamped })
+}
+
+/** 开场保留轮数按整数保存；越界夹到 0~10 */
+export const setPinnedRounds = (value: number) => {
+  const clamped = Math.min(
+    MAX_PINNED_ROUNDS,
+    Math.max(MIN_PINNED_ROUNDS, Math.round(value))
+  )
+  write(KEYS.pinnedRounds, String(clamped))
+  useSettings.setState({ pinnedRounds: clamped })
 }
 
 /**
@@ -364,8 +385,8 @@ export const applyFileMode = (mode: 'fast' | 'expert') => {
   const preset = FILE_MODE_PRESETS[mode]
   write(KEYS.parseDepth, preset.parseDepth)
   write(KEYS.fileResend, preset.fileResend)
-  write(KEYS.autoCompact, String(preset.autoCompact))
   write(KEYS.compactThreshold, String(preset.compactThreshold))
+  write(KEYS.pinnedRounds, String(preset.pinnedRounds))
   write(KEYS.contextLimit, String(preset.contextLimit))
   useSettings.setState(preset)
 }

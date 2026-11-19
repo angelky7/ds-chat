@@ -384,15 +384,25 @@ export type RequestOptions = {
   contextLimit?: number
   /** 历史附件重发方式；默认 once */
   fileResend?: 'once' | 'every-turn'
-  /** 已生效的上下文压缩：用摘要替换 coveredUntil 及其之前的轮次 */
+  /** 已生效的上下文压缩：用摘要替换 coveredFrom 到 coveredUntil 之间的轮次 */
   compaction?: { summary: string; coveredUntil: string }
+  /** 开场保留轮数：这些轮次的原文固定发送，不参与压缩 */
+  pinnedRounds?: number
 }
 
-/** 摘要提示词里的包裹说明：把它当作已确立的背景，不要复述，也不要提到压缩本身 */
+/** 摘要提示词里的包裹说明（无开场保留时）：把它当作已确立的背景，不要复述，也不要提到压缩本身 */
 const CHECKPOINT_PREAMBLE =
   'This is an automatically generated checkpoint condensing an earlier span of the conversation to free up context. ' +
   'Treat it as established background, build on it without restating it, and continue the task directly from the ' +
   'messages that follow. Do not mention this checkpoint.'
+
+/** 有开场保留轮次时的包裹说明：检查点只代表开场轮次与最近消息之间的「中段」历史 */
+const CHECKPOINT_PREAMBLE_PINNED =
+  'The conversation above this block consists of the opening rounds, preserved verbatim because they contain ' +
+  'setup and constraints referenced throughout. The following checkpoint summarizes the MIDDLE portion of the ' +
+  'history — everything between those opening rounds and the most recent messages. It replaces those middle ' +
+  'turns, not the entire early history. Treat the opening rounds as fully authoritative, this checkpoint as ' +
+  'a faithful condensation of what came after them, and the messages following this block as the latest turns.'
 
 /**
  * 把会话转成请求的 messages：只保留「提问 + 有回答的回复」成对的轮次，最后接上本轮提问。
@@ -417,29 +427,33 @@ export const toRequestMessages = (
     }
   }
   const contextRounds = getContextRounds(history)
-  let rounds = contextRounds
+  // 发送顺序：开场 N 轮原文 → 检查点 → 未覆盖轮次。
+  // 开场轮次原文照发；压缩只作用于开场轮次之后的区间。
+  const pinnedCount = Math.min(options.pinnedRounds ?? 0, contextRounds.length)
+  const opening = contextRounds.slice(0, pinnedCount)
+  let rest = contextRounds.slice(pinnedCount)
   /**
    * 检查点不单独占一条 user 消息：它会和后面第一条提问连成两条 user，
-   * 严格的 Anthropic 兼容服务商会判为非法。这里把它并进第一条保留的提问。
+   * 严格的 Anthropic 兼容服务商会判为非法。这里把它并进第一条未覆盖的提问。
    */
   let checkpoint = ''
-  // 摘要覆盖的轮次不再发送：coveredUntil 找不到对应轮次（切分支、消息被删）时按未压缩处理。
-  // 先按压缩裁剪、再按轮次上限裁剪，两者都只切在轮次边界上。
   if (options.compaction) {
-    const coveredIndex = contextRounds.findIndex(
-      ([user]) => user.id === options.compaction?.coveredUntil
-    )
+    // coveredUntil 找不到对应轮次（切分支、消息被删、N 调大后覆盖区落入开场）时按未压缩处理
+    const coveredIndex = rest.findIndex(([user]) => user.id === options.compaction?.coveredUntil)
     if (coveredIndex >= 0) {
-      rounds = contextRounds.slice(coveredIndex + 1)
-      checkpoint = `${CHECKPOINT_PREAMBLE}\n\n<compacted-summary>\n${options.compaction.summary.trim()}\n</compacted-summary>`
+      rest = rest.slice(coveredIndex + 1)
+      const preamble = pinnedCount > 0 ? CHECKPOINT_PREAMBLE_PINNED : CHECKPOINT_PREAMBLE
+      checkpoint = `${preamble}\n\n<compacted-summary>\n${options.compaction.summary.trim()}\n</compacted-summary>`
     }
   }
   const limit = options.contextLimit ?? 0
-  if (limit > 0 && rounds.length > limit) {
-    rounds = rounds.slice(-limit)
+  if (limit > 0 && rest.length > limit) {
+    rest = rest.slice(-limit)
   }
   // every-turn 对两种模式都生效：内联文档是文本块、历史图片可从 IndexedDB 取原件
   const everyTurn = options.fileResend === 'every-turn'
+  const rounds = [...opening, ...rest]
+  const checkpointIndex = checkpoint && rest.length > 0 ? opening.length : -1
   rounds.forEach(([user, reply], index) => {
     const keepImages = index >= rounds.length - HISTORIC_IMAGE_ROUNDS
     const files = everyTurn ? user.files : keepImages ? user.files.filter((file) => file.isImage) : []
@@ -447,8 +461,8 @@ export const toRequestMessages = (
     // 附件没能进请求（文档不回传、已超出上下文、或本地已没有原件）时补一句说明，
     // 既保住这一轮问答，也避免模型假装读过原文。
     const content = [
-      // 检查点并入第一条保留的提问：既保住摘要，也不会出现连续两条 user
-      index === 0 ? checkpoint : '',
+      // 检查点并入第一条未覆盖的提问：既保住摘要，也不会出现连续两条 user
+      index === checkpointIndex ? checkpoint : '',
       user.content,
       user.files.length > 0 && blocks.length === 0 ? OMITTED_ATTACHMENTS : '',
     ]
@@ -466,10 +480,10 @@ export const toRequestMessages = (
     )
   })
   appendReminder(latestReminder)
-  // 所有轮次都被覆盖时没有可并入的提问，只能把检查点并进本轮提问
+  // 未覆盖轮次为空时没有可并入的提问，只能把检查点并进本轮提问
   messages.push(
     toUserParam(
-      checkpoint && rounds.length === 0
+      checkpoint && rest.length === 0
         ? { ...question, content: [checkpoint, question.content].filter(Boolean).join('\n\n') }
         : question,
       images

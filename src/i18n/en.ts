@@ -126,14 +126,18 @@ export const en = {
   settingsParseDepthDescription:
     'Text-only is faster and cheaper but cannot read tables or text inside images; layout parsing keeps the structure and images.',
   settingsContextPressure: 'About {tokens} tokens in context · {percent}% of the window',
-  settingsCompactThreshold: 'Auto-compact threshold',
+  settingsCompactThreshold: 'Compaction threshold',
   settingsCompactThresholdDescription:
     'Compact once the context fills this share of the model window. Lower it to replace older rounds with a summary sooner — cheaper, but details are lost earlier.',
-  settingsAutoCompact: 'Auto-compact context',
-  settingsAutoCompactDescription:
-    'Off by default. When enabled, older rounds are condensed into a summary once usage reaches the threshold; past 100% of the window it also compacts as a last resort when off, or the request cannot be sent.',
+  settingsCustomThreshold: 'Custom threshold',
+  settingsCustomThresholdDescription:
+    'Off: compaction always triggers at 85%. On: adjust the trigger point with the slider below.',
+  settingsPinnedRounds: 'Pinned opening rounds',
+  settingsPinnedRoundsDescription:
+    'Keep the first few rounds verbatim; they never get compacted. Recommended when the opening contains important setup. 0 disables it.',
   chatCompacting: 'Compacting earlier context to save tokens…',
-  chatCompactOverWindow: 'Context exceeded the window — compacted before sending',
+  chatMessageOverWindow:
+    'This message exceeds the model window — split it into several messages, or attach it as a file and ask about it',
   settingsAutoCompactFailed: 'Compaction did not finish — try compacting manually',
   settingsAutoCompactDone: 'Compaction complete, saved about {tokens} tokens',
   settingsAutoCompactDoneTight: 'Compaction complete, but nothing was saved this time',
@@ -147,11 +151,13 @@ export const en = {
     'Compacted {rounds} rounds, but the summary is longer than the original text — nothing saved this time',
   settingsCompactClear: 'Restore original',
   settingsCompactCleared: 'Full history restored',
-  settingsCompactEmpty: 'Nothing to compact in this conversation yet (at least 3 rounds required)',
+  settingsCompactEmpty: 'Nothing to compact yet (at least 3 rounds are needed after the pinned opening rounds)',
   settingsCompactNoSession: 'Open a conversation first',
   settingsCompactFailed: 'Compaction failed: no summary was produced, context unchanged',
   settingsCompactTruncated: 'Compaction failed: the summary exceeded the output limit and was truncated; context unchanged',
   settingsCompactFailedReason: 'Compaction failed: {message} (context unchanged)',
+  settingsCompactFloor:
+    'Context is still above the threshold but nothing more can be compacted — start a new conversation or reduce the pinned opening rounds',
   settingsTemperature: 'Model temperature',
   settingsTemperatureDescription:
     'Lower keeps answers steady and close to the source; higher is more varied. Fixed at 1.0 while deep thinking is on.',

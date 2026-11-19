@@ -8,7 +8,7 @@ import { extractFileIds, getFileErrorCode, isRetryableApiError } from '../api/er
 import { cancelUpload, describeUploadError, uploadAttachment, useUploads } from '../attachments.js'
 import { translate } from '../../i18n/index.js'
 import { showToast } from '../../components/base/toastState.js'
-import { DEFAULT_TEMPERATURE, useSettings } from '../settings.js'
+import { DEFAULT_TEMPERATURE, DEFAULT_COMPACT_THRESHOLD, useSettings } from '../settings.js'
 import {
   DEEPSEEK_DEFAULT_PROMPT,
   resolveActiveOpening,
@@ -27,11 +27,14 @@ import {
 } from './drafts.js'
 import { createLatestReminder } from './latestReminder.js'
 import {
+  COMPACT_RETAIN_RATIO,
   CompactionError,
   compactConversation,
   contextWindowOf,
   estimateContextTokens,
+  estimateTokens,
   savedTokensOf,
+  selectCompactionPlan,
 } from './compact.js'
 import {
   applyEvent,
@@ -166,6 +169,8 @@ const sessionAccess = new Map<string, number>()
 const unsavedSessions = new Set<string>()
 /** 保存失败时保留原件，重试成功后才释放。 */
 const pendingFiles = new Map<string, db.StoredFile[]>()
+/** 压缩止损：记录上次「压不动」时的最后一条消息 id，内容没变化就不再重复尝试 */
+const compactionFloorAt = new Map<string, string>()
 const deletingSessions = new Set<string>()
 const deletionTasks = new Set<Promise<boolean>>()
 const streamFlushes = new Map<string, () => void>()
@@ -473,6 +478,7 @@ export const replaceHistory = async (write: () => Promise<void>): Promise<number
     sessionAccess.clear()
     unsavedSessions.clear()
     pendingFiles.clear()
+    compactionFloorAt.clear()
     clearAllDrafts()
     set({
       ready: true,
@@ -610,7 +616,8 @@ const runCompaction = async (
   sessionId: string,
   history: Message[],
   signal: AbortSignal,
-  force = false
+  force = false,
+  pinnedRounds = 0
 ): Promise<Compaction> => {
   const session = getSession(sessionId)
   if (!session) {
@@ -622,11 +629,12 @@ const runCompaction = async (
   try {
     const outcome = await compactConversation({
       history,
-      ...(session.compaction ? { previous: { summary: session.compaction.summary } } : {}),
+      ...(session.compaction ? { previous: session.compaction } : {}),
       provider,
       model,
       system: resolveActiveSystemPrompt(model),
       force,
+      pinnedRounds,
       signal,
     })
     const compaction: Compaction = { ...outcome, at: Date.now() }
@@ -650,12 +658,19 @@ export const compactSession = async (sessionId: string): Promise<Compaction> => 
   }
   const history = getVisibleMessages(session)
   const controller = new AbortController()
-  // 手动压缩不受窗口比例限制：用户点了就压掉除最近两轮外的全部内容
-  return runCompaction(sessionId, history, controller.signal, true)
+  // 手动压缩不受窗口比例限制：压掉除开场保留轮次与最近两轮外的全部内容
+  return runCompaction(
+    sessionId,
+    history,
+    controller.signal,
+    true,
+    useSettings.getState().pinnedRounds
+  )
 }
 
 /** 丢弃检查点，恢复发送完整历史；原文一直在本地，不需要重建 */
 export const clearCompaction = (sessionId: string) => {
+  compactionFloorAt.delete(sessionId)
   updateSession(sessionId, (session) => {
     if (!session.compaction) {
       return session
@@ -684,6 +699,14 @@ export const sendMessage = (targetSessionId: string | null) => {
     return false
   }
   const { text, files } = prepared
+  // 防线一：单条消息本身超过模型窗口时请求必然失败，直接拒发并说明原因
+  const messageTokens =
+    estimateTokens(text) +
+    files.reduce((sum, file) => sum + (file.text ? estimateTokens(file.text) : 64), 0)
+  if (messageTokens >= contextWindowOf(activeProvider().model)) {
+    showToast({ key: 'chatMessageOverWindow' })
+    return false
+  }
   const now = Date.now()
   let sessionId = targetSessionId
   if (
@@ -1214,48 +1237,83 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
       let preparing = true
       let receivedContent = false
       try {
-        // 保底压缩：估算超过窗口 100% 时再不压缩，请求必然被上游拒绝，与开关无关。
-        // 主动压缩：开了「自动压缩上下文」且达到阈值时提前压，省额度也少丢细节。
+        // 压缩永远生效：有效上下文（未覆盖轮次 + 摘要 + 开场保留轮次）达到阈值即压缩。
         // 压缩失败只记在控制台，继续按原有方式发送，绝不因压缩问题挡住消息。
         const autoModel = resolveModel(initial.model, provider)
         const pressureWindow = contextWindowOf(autoModel)
-        const pressure = estimateContextTokens(request.history)
-        const overWindow = pressure >= pressureWindow
-        const { autoCompact, compactThreshold } = useSettings.getState()
-        const proactive = autoCompact && pressure >= pressureWindow * (compactThreshold / 100)
-        if (overWindow || proactive) {
-          const done = await runCompaction(
-            sessionId,
-            request.history,
-            controller.signal
-          ).catch((error: unknown) => {
-            // 没有可压内容或用户中断都不必打扰；只有摘要真的失败才提示
-            const silent =
-              error instanceof CompactionError &&
-              (error.reason === 'nothing-to-compact' || error.reason === 'aborted')
-            if (!silent) {
-              // 自动压缩失败在界面上只有一句提示，详细原因打到控制台便于排查
-              // eslint-disable-next-line no-console
-              console.warn('[auto-compact] failed:', error)
-              showToast({ key: 'settingsAutoCompactFailed' })
-            }
-            return null
-          })
-          // 自动压缩静默发生，成功时提示一次；否则用户会以为早期消息凭空消失
-          if (done) {
-            if (overWindow && !proactive) {
-              // 保底压缩在开关关闭时也会发生，必须点明原因
-              showToast({ key: 'chatCompactOverWindow' })
+        const {
+          customThresholdEnabled,
+          compactThreshold: thresholdSetting,
+          pinnedRounds,
+        } = useSettings.getState()
+        const threshold =
+          (customThresholdEnabled ? thresholdSetting : DEFAULT_COMPACT_THRESHOLD) / 100
+        const pressure = estimateContextTokens(
+          request.history,
+          getSession(sessionId)?.compaction,
+          pinnedRounds
+        )
+        if (pressure >= pressureWindow * threshold) {
+          // 上次「压不动」时的最后一条消息：内容没变化就不再重复尝试，新增轮次后允许重试
+          const floorKey = request.history[request.history.length - 1]?.id ?? ''
+          const floored = floorKey !== '' && compactionFloorAt.get(sessionId) === floorKey
+          if (!floored) {
+            const existing = getSession(sessionId)?.compaction
+            // 防线二：开场保留轮次与旧检查点之外已没有足够的新轮次 → 止损，不再反复尝试
+            const plan = selectCompactionPlan(
+              request.history,
+              Math.round(pressureWindow * COMPACT_RETAIN_RATIO),
+              false,
+              pinnedRounds,
+              existing
+            )
+            if (!plan) {
+              // 没有可压区间，或旧检查点之后没有足够的新轮次（压了也不会有进展）
+              compactionFloorAt.set(sessionId, floorKey)
+              showToast({ key: 'settingsCompactFloor' })
             } else {
-              const saved = savedTokensOf(done)
-              showToast(
-                saved > 0
-                  ? {
-                      key: 'settingsAutoCompactDone',
-                      params: { tokens: saved.toLocaleString() },
-                    }
-                  : { key: 'settingsAutoCompactDoneTight' }
-              )
+              const done = await runCompaction(
+                sessionId,
+                request.history,
+                controller.signal,
+                false,
+                pinnedRounds
+              ).catch((error: unknown) => {
+                // 没有可压内容或用户中断都不必打扰；只有摘要真的失败才提示
+                const silent =
+                  error instanceof CompactionError &&
+                  (error.reason === 'nothing-to-compact' || error.reason === 'aborted')
+                if (error instanceof CompactionError && error.reason === 'nothing-to-compact') {
+                  // 选区间与实际执行之间出现竞态：同样记为「压不动」，避免下次重复尝试
+                  compactionFloorAt.set(sessionId, floorKey)
+                }
+                if (!silent) {
+                  // 自动压缩失败在界面上只有一句提示，详细原因打到控制台便于排查
+                  // eslint-disable-next-line no-console
+                  console.warn('[auto-compact] failed:', error)
+                  showToast({ key: 'settingsAutoCompactFailed' })
+                }
+                return null
+              })
+              if (done) {
+                // 防线三：有效上下文降幅不足 10% 且压力仍超阈值 → 无进展，提示并停止后续重试
+                const after = estimateContextTokens(request.history, done, pinnedRounds)
+                const reduction = (pressure - after) / Math.max(pressure, 1)
+                if (reduction < 0.1 && after >= pressureWindow * threshold) {
+                  compactionFloorAt.set(sessionId, floorKey)
+                  showToast({ key: 'settingsCompactFloor' })
+                } else {
+                  const saved = savedTokensOf(done)
+                  showToast(
+                    saved > 0
+                      ? {
+                          key: 'settingsAutoCompactDone',
+                          params: { tokens: saved.toLocaleString() },
+                        }
+                      : { key: 'settingsAutoCompactDoneTight' }
+                  )
+                }
+              }
             }
           }
         }
@@ -1293,6 +1351,8 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
             contextLimit,
             // 内联文档靠文本注入，every-turn 对第三方服务商同样生效
             fileResend,
+            // 开场 N 轮原文固定发送、不参与压缩
+            pinnedRounds,
             ...(compaction
               ? { compaction: { summary: compaction.summary, coveredUntil: compaction.coveredUntil } }
               : {}),

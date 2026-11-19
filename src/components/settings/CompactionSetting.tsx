@@ -10,6 +10,7 @@ import {
 } from '../../services/chat/compact.js'
 import { clearCompaction, compactSession, useChatStore } from '../../services/chat/store.js'
 import { activeProvider } from '../../services/providers.js'
+import { useSettings } from '../../services/settings.js'
 import { Button } from '../base/Button.js'
 import { SettingCell, type SettingStatus } from './SettingCell.js'
 import styles from './CompactionSetting.module.css'
@@ -46,10 +47,14 @@ export const CompactionSetting = () => {
   const busy = useChatStore((state) =>
     state.activeId ? Boolean(state.compacting[state.activeId]) : false
   )
-  // 估算当前上下文压力：只统计会进请求的轮次，附件按每个 64 token 粗计
+  // 估算当前上下文压力：只统计「会真正发出去」的内容（未覆盖轮次 + 摘要 + 开场保留轮次）
   const pressure = useChatStore((state) => {
     const session = state.activeId ? state.sessionCache[state.activeId] : undefined
-    return session ? estimateContextTokens(getVisibleMessages(session)) : 0
+    if (!session) {
+      return 0
+    }
+    const { pinnedRounds } = useSettings.getState()
+    return estimateContextTokens(getVisibleMessages(session), session.compaction, pinnedRounds)
   })
   const window = contextWindowOf(activeProvider().model)
   const percent = window > 0 ? (pressure / window) * 100 : 0

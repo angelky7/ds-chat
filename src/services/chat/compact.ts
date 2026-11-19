@@ -10,7 +10,7 @@ import type { AssistantMessage, Message, UserMessage } from './types.js'
  * 原文仍保留在会话里（只是不再发送），摘要生成失败时一律不落地，退回原有的轮次截断逻辑。
  *
  * 策略与提示词结构参考 DeepSeek Harness（MIT）的 packages/compaction/compaction-basic：
- * 阈值可配（默认 80% 窗口）、保留最近 16% 原文、摘要在输出被截断时视为失败；
+ * 达到阈值（默认 85% 窗口）即压缩、保留最近 16% 原文与开场 N 轮、摘要在输出被截断时视为失败；
  * 与上游不同的是原文始终留在本地，只影响发送内容，不删数据。
  */
 export const COMPACT_RETAIN_RATIO = 0.16
@@ -64,8 +64,30 @@ const roundTokens = ([user, reply]: [UserMessage, AssistantMessage]): number =>
   user.files.reduce((sum, file) => sum + (file.text ? estimateTokens(file.text) : 64), 0)
 
 /** 一轮对话的估算用量，供界面展示当前上下文压力 */
-export const estimateContextTokens = (history: Message[]): number =>
-  getContextRounds(history).reduce((sum, round) => sum + roundTokens(round), 0)
+export const estimateContextTokens = (
+  history: Message[],
+  compaction?: { coveredUntil: string; summary: string },
+  pinnedRounds = 0
+): number => {
+  const rounds = getContextRounds(history)
+  const untilIndex = compaction
+    ? rounds.findIndex(([user]) => user.id === compaction.coveredUntil)
+    : -1
+  // 覆盖区间不在当前消息链上（切分支/切换版本）：回退为全量历史估算，不报错
+  if (!compaction || untilIndex < 0) {
+    return rounds.reduce((sum, round) => sum + roundTokens(round), 0)
+  }
+  // 有效上下文 = 摘要 + 开场保留轮次原文 + 覆盖区之后的轮次；
+  // 开场轮次与旧覆盖区重叠时只按原文计一次。
+  const pinned = Math.min(pinnedRounds, rounds.length)
+  let total = estimateTokens(compaction.summary)
+  for (let index = 0; index < rounds.length; index += 1) {
+    if (index < pinned || index > untilIndex) {
+      total += roundTokens(rounds[index])
+    }
+  }
+  return total
+}
 
 /**
  * 省下的 token = 被覆盖轮次的估算量 - 摘要自身占用的量。
@@ -75,6 +97,8 @@ export const savedTokensOf = (compaction: { tokens: number; summary: string }): 
   Math.max(0, compaction.tokens - estimateTokens(compaction.summary))
 
 export type CompactionPlan = {
+  /** 被覆盖的第一轮提问 id */
+  coveredFrom: string
   /** 被覆盖的最后一轮提问 id */
   coveredUntil: string
   /** 被覆盖的轮数 */
@@ -88,15 +112,25 @@ export type CompactionPlan = {
 /**
  * 选择可压缩区间：从尾部往前累计，攒够 retainTokens 就停，前面剩下的整段作为压缩对象。
  * 只在轮次边界上切分，不会切出孤立的提问或回答。
- * force 用于手动压缩：短对话根本攒不到窗口的 16%，此时保留最近两轮，其余全部压掉。
+ * 开场 pinnedRounds 轮原文固定保留（不进入摘要，也不计入覆盖区）。
+ * 已生效的检查点覆盖到 coveredUntil，那次之前的轮次不再重放，只压缩新增区间并把旧摘要合并进来。
+ * force 用于手动压缩：不受 16% 保留比例限制，只留最近两轮（开场轮次除外）。
  */
 export const selectCompactionPlan = (
   history: Message[],
   retainTokens: number,
-  force = false
+  force = false,
+  pinnedRounds = 0,
+  previous?: { coveredFrom: string; coveredUntil: string; tokens?: number }
 ): CompactionPlan | null => {
   const rounds = getContextRounds(history)
-  if (rounds.length < MIN_COVERED_ROUNDS + 1) {
+  const pinned = Math.min(pinnedRounds, rounds.length)
+  // 旧检查点覆盖到哪一轮；找不到（切分支、消息被删）时按未压缩处理
+  const untilIndex = previous
+    ? rounds.findIndex(([user]) => user.id === previous.coveredUntil)
+    : -1
+  const start = Math.max(pinned, untilIndex >= 0 ? untilIndex + 1 : 0)
+  if (rounds.length < start + MIN_COVERED_ROUNDS + 1) {
     return null
   }
   let accumulated = 0
@@ -108,17 +142,24 @@ export const selectCompactionPlan = (
       break
     }
   }
-  if (force && keepFrom < MIN_COVERED_ROUNDS) {
-    keepFrom = Math.max(MIN_COVERED_ROUNDS, rounds.length - 2)
+  if (force) {
+    keepFrom = Math.max(start + MIN_COVERED_ROUNDS, rounds.length - 2)
   }
-  if (keepFrom < MIN_COVERED_ROUNDS) {
+  // 已覆盖区间不因尾部保留而回缩：否则会出现「压完反而少覆盖」的抖动
+  keepFrom = Math.min(rounds.length, Math.max(keepFrom, start))
+  // 开场轮次与旧覆盖区之外没有足够的新轮次：没有可压缩的内容
+  if (keepFrom - start < MIN_COVERED_ROUNDS) {
     return null
   }
-  const covered = rounds.slice(0, keepFrom)
+  const covered = rounds.slice(start, keepFrom)
   return {
+    coveredFrom:
+      untilIndex >= 0 ? (previous?.coveredFrom ?? rounds[untilIndex][0].id) : covered[0][0].id,
     coveredUntil: covered[covered.length - 1][0].id,
     rounds: covered.length,
-    tokens: covered.reduce((sum, round) => sum + roundTokens(round), 0),
+    tokens:
+      covered.reduce((sum, round) => sum + roundTokens(round), 0) +
+      (untilIndex >= 0 ? (previous?.tokens ?? 0) : 0),
     covered,
   }
 }
@@ -161,6 +202,8 @@ const COMPACTION_INSTRUCTION = [
   'Rules:',
   '- Preserve exact file paths, commands, error strings, identifiers and numbers.',
   '- Capture user corrections and explicit instructions faithfully.',
+  '- Condense ONLY the rounds replayed above. If any verbatim opening messages precede them, they are kept',
+  '  elsewhere in full — do not restate, summarize or duplicate their content in the checkpoint.',
   '- Do NOT mention this summarization request or that the context was compacted.',
   '- Output only the checkpoint text; do not call any tool.',
   '- If the conversation already contains a <compacted-summary> block, it is a PRIOR checkpoint: merge it into the',
@@ -169,6 +212,8 @@ const COMPACTION_INSTRUCTION = [
 
 export type CompactionOutcome = {
   summary: string
+  /** 被覆盖的第一轮提问 id */
+  coveredFrom: string
   coveredUntil: string
   rounds: number
   tokens: number
@@ -177,14 +222,19 @@ export type CompactionOutcome = {
 
 export type CompactionInput = {
   history: Message[]
-  /** 上一次压缩的产物：先前的检查点会并入新摘要，避免反复压缩丢掉更早的结论 */
-  previous?: { summary: string }
+  /**
+   * 上一次压缩的产物：已覆盖的轮次不再重放，只压新增区间并把旧摘要合并进来，
+   * 避免每次压缩都重读全部历史（又慢又贵）。
+   */
+  previous?: { summary: string; coveredFrom: string; coveredUntil: string; tokens: number }
   provider: ActiveProvider
   model: string
   /** 当前生效的系统提示词；重放时带上，尽量贴近真实请求 */
   system: string
   /** 手动压缩：不受 16% 保留比例限制，只留最近两轮 */
   force?: boolean
+  /** 开场保留轮数：这些轮次的原文固定发送，不进入摘要 */
+  pinnedRounds?: number
   signal: AbortSignal
 }
 
@@ -267,8 +317,8 @@ const summarize = async (
 const mergeInstruction = (previous: string | undefined): string =>
   previous?.trim()
     ? [
-        'A prior checkpoint covering even earlier history follows. Merge its still-true facts into the new',
-        'summary, drop what is stale, and do not copy it forward verbatim.',
+        'A prior checkpoint covering an even earlier portion of the history follows. Merge its still-true facts',
+        'into the new summary, drop what is stale, and do not copy it forward verbatim.',
         '',
         '<compacted-summary>',
         previous.trim(),
@@ -316,10 +366,17 @@ export const compactConversation = async ({
   model,
   system,
   force = false,
+  pinnedRounds = 0,
   signal,
 }: CompactionInput): Promise<CompactionOutcome> => {
   const window = contextWindowOf(model)
-  const plan = selectCompactionPlan(history, Math.round(window * COMPACT_RETAIN_RATIO), force)
+  const plan = selectCompactionPlan(
+    history,
+    Math.round(window * COMPACT_RETAIN_RATIO),
+    force,
+    pinnedRounds,
+    previous
+  )
   if (!plan) {
     throw new CompactionError('nothing-to-compact')
   }
@@ -349,6 +406,7 @@ export const compactConversation = async ({
 
   return {
     summary,
+    coveredFrom: plan.coveredFrom,
     coveredUntil: plan.coveredUntil,
     rounds: plan.rounds,
     tokens: plan.tokens,

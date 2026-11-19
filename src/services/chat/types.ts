@@ -112,11 +112,13 @@ export type Message = UserMessage | AssistantMessage
 
 /**
  * 上下文压缩产物：把「提问 + 回答」较早的一段压成摘要，后续请求用摘要替代那些轮次。
- * 原文仍然留在会话里，只是不再发出去；coveredUntil 之前的轮次（含该条提问）视为已覆盖。
+ * 原文仍然留在会话里，只是不再发出去；coveredFrom 到 coveredUntil 之间的轮次（含两端提问）视为已覆盖。
  */
 export type Compaction = {
   /** 模型生成的检查点正文（Markdown），已去掉包裹标签 */
   summary: string
+  /** 被覆盖的第一轮提问的消息 id；找不到该轮时按未压缩处理 */
+  coveredFrom: string
   /** 被覆盖的最后一轮提问的消息 id；找不到该轮时检查点失效，按未压缩处理 */
   coveredUntil: string
   /** 被覆盖的轮数，仅用于界面展示 */

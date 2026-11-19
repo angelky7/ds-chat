@@ -118,14 +118,16 @@ export const zh = {
   settingsParseDepthDescription:
     '只提文字更快更省，但读不出表格与图片里的内容；版面解析能保留结构和图片。',
   settingsContextPressure: '当前上下文约 {tokens} tokens · 占窗口 {percent}%',
-  settingsCompactThreshold: '自动压缩阈值',
+  settingsCompactThreshold: '压缩阈值',
   settingsCompactThresholdDescription:
-    '上下文占用达到模型窗口的这个比例时自动压缩。调低会更早把早期对话换成摘要，更省额度，但细节丢得更早。',
-  settingsAutoCompact: '自动压缩上下文',
-  settingsAutoCompactDescription:
-    '默认关闭。开启后，估算用量达到「自动压缩阈值」就先把较早的轮次压成摘要再发送；超过窗口 100% 时即使关闭也会兜底压缩，否则请求无法发送。',
+    '上下文占用达到窗口的这个比例时自动压缩。调低会更早把早期对话换成摘要，更省额度，但细节丢得更早。',
+  settingsCustomThreshold: '自定义压缩阈值',
+  settingsCustomThresholdDescription: '关闭时固定按 85% 触发压缩；开启后用下方滑条调整触发比例。',
+  settingsPinnedRounds: '开场保留轮数',
+  settingsPinnedRoundsDescription:
+    '固定保留开场若干轮原文，不参与压缩。开场包含重要设定时建议保留。0 表示不保留。',
   chatCompacting: '正在压缩早期上下文，为你节省 token…',
-  chatCompactOverWindow: '上下文超出窗口，已自动压缩后再发送',
+  chatMessageOverWindow: '这条消息太长，超过模型窗口——请拆分成多条发送，或作为文件上传后再提问',
   settingsAutoCompactFailed: '压缩未完成，建议手动压缩',
   settingsAutoCompactDone: '压缩完成，约节约了 {tokens} token',
   settingsAutoCompactDoneTight: '压缩完成，但这次没省下 token',
@@ -138,11 +140,12 @@ export const zh = {
   settingsCompactTight: '已压缩 {rounds} 轮，但摘要比原文还长，这次没有省下 token',
   settingsCompactClear: '恢复原文',
   settingsCompactCleared: '已恢复完整历史',
-  settingsCompactEmpty: '当前对话还没有可压缩的内容（至少需要 3 轮对话）',
+  settingsCompactEmpty: '当前对话还没有可压缩的内容（开场保留轮次之外至少还需要 3 轮）',
   settingsCompactNoSession: '先打开一个对话再压缩',
   settingsCompactFailed: '压缩失败：摘要没有生成，上下文保持原样',
   settingsCompactTruncated: '压缩失败：摘要超出输出上限被截断，上下文保持原样',
   settingsCompactFailedReason: '压缩失败：{message}（上下文保持原样）',
+  settingsCompactFloor: '上下文仍超出阈值，但已没有可压缩的内容——请新开会话或减少开场保留轮数',
   settingsTemperature: '模型温度',
   settingsTemperatureDescription:
     '越低回答越稳、越贴近原文，越高越发散；开启深度思考时固定为 1.0，此项不生效。',

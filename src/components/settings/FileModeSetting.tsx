@@ -7,9 +7,10 @@ import {
   fileModeChanged,
   MAX_COMPACT_THRESHOLD,
   MIN_COMPACT_THRESHOLD,
-  setAutoCompact,
   setCompactThreshold,
+  setCustomThresholdEnabled,
   setParseDepth,
+  setPinnedRounds,
   useSettings,
   type ParseDepth,
 } from '../../services/settings.js'
@@ -49,8 +50,8 @@ const Segmented = ({
   </div>
 )
 
-/** 自动压缩阈值：窗口占用达到该百分比时触发，整数存储 */
-const ThresholdSlider = ({ value }: { value: number }) => {
+/** 压缩阈值：窗口占用达到该百分比时触发压缩，整数存储；未开启自定义时置灰 */
+const ThresholdSlider = ({ value, disabled }: { value: number; disabled: boolean }) => {
   const t = useTranslate()
   return (
     <div className={sliderStyles.wrap}>
@@ -63,6 +64,7 @@ const ThresholdSlider = ({ value }: { value: number }) => {
         min={MIN_COMPACT_THRESHOLD}
         max={MAX_COMPACT_THRESHOLD}
         step={5}
+        disabled={disabled}
         label={t('settingsCompactThreshold')}
         formatValue={(next) => `${Math.round(next)}%`}
         onChange={setCompactThreshold}
@@ -74,8 +76,33 @@ const ThresholdSlider = ({ value }: { value: number }) => {
   )
 }
 
+/** 开场保留轮数：固定原文发送、不参与压缩 */
+const PinnedRoundsSlider = ({ value }: { value: number }) => {
+  const t = useTranslate()
+  return (
+    <div className={sliderStyles.wrap}>
+      <div className={sliderStyles.head}>
+        <span className={sliderStyles.label}>{t('settingsPinnedRounds')}</span>
+        <span className={sliderStyles.value}>{value}</span>
+      </div>
+      <MduiSlider
+        value={value}
+        min={0}
+        max={10}
+        step={1}
+        label={t('settingsPinnedRounds')}
+        formatValue={(next) => `${Math.round(next)}`}
+        onChange={setPinnedRounds}
+      />
+      <div className={sliderStyles.foot}>
+        <span className={sliderStyles.hint}>{t('settingsPinnedRoundsDescription')}</span>
+      </div>
+    </div>
+  )
+}
+
 /**
- * 处理模式：快速 / 专家两个预设，一次写好解析深度、附件重发、自动压缩与阈值、轮次上限。
+ * 处理模式：快速 / 专家两个预设，一次写好解析深度、附件重发、压缩阈值、开场保留轮数、轮次上限。
  * 模式本身不存储，由细项反推；改动任一细项后自动显示「自定义」，避免两个数据源打架。
  */
 export const FileModeSetting = () => {
@@ -83,8 +110,9 @@ export const FileModeSetting = () => {
   const mode = useSettings(activeFileMode)
   const changed = useSettings(fileModeChanged)
   const parseDepth = useSettings((state) => state.parseDepth)
-  const autoCompact = useSettings((state) => state.autoCompact)
+  const customThresholdEnabled = useSettings((state) => state.customThresholdEnabled)
   const threshold = useSettings((state) => state.compactThreshold)
+  const pinnedRounds = useSettings((state) => state.pinnedRounds)
   const [open, setOpen] = useState(false)
 
   const description =
@@ -146,18 +174,19 @@ export const FileModeSetting = () => {
           />
           <FileResendSetting />
           <SettingCell
-            label={t('settingsAutoCompact')}
-            description={t('settingsAutoCompactDescription')}
+            label={t('settingsCustomThreshold')}
+            description={t('settingsCustomThresholdDescription')}
             status={null}
             action={
               <Switch
-                checked={autoCompact}
-                label={t('settingsAutoCompact')}
-                onChange={setAutoCompact}
+                checked={customThresholdEnabled}
+                label={t('settingsCustomThreshold')}
+                onChange={setCustomThresholdEnabled}
               />
             }
           />
-          {autoCompact ? <ThresholdSlider value={threshold} /> : null}
+          <ThresholdSlider value={threshold} disabled={!customThresholdEnabled} />
+          <PinnedRoundsSlider value={pinnedRounds} />
           <ContextLimitSlider />
         </div>
       ) : null}
