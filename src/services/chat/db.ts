@@ -278,6 +278,14 @@ export const commitStaging = async (): Promise<SessionSummary[]> => {
   return summaries
 }
 
+/**
+ * 申请持久化存储：默认情况下浏览器在磁盘紧张时会清掉本站数据（对话就在 IndexedDB 里），
+ * 表现为「用过一段时间后记录凭空消失」。授权后不会被自动回收；被拒绝也不影响正常使用。
+ */
+export const requestPersistentStorage = () => {
+  void navigator.storage?.persist?.().catch(() => {})
+}
+
 /** 本地存储失败不打断对话，只在控制台留痕 */
 export const reportStorageError = (action: string) => (error: unknown) => {
   // eslint-disable-next-line no-console

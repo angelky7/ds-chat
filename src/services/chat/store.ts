@@ -241,43 +241,64 @@ const updateReply = (sessionId: string, reply: AssistantMessage) =>
     ),
   }))
 
+/**
+ * 每个会话的保存串行化：saveSession 要先把附件转成 ArrayBuffer，带附件的保存会慢于后一次保存，
+ * 两次保存乱序提交时旧快照会把新内容盖掉（表现为刷新后最后几条消息或回答消失）。
+ * 按调用顺序排队，保证最后一次调用对应的快照最终落盘。
+ */
+const saveQueues = new Map<string, Promise<void>>()
+
 const persist = (sessionId: string) => {
   const session = getSession(sessionId)
-  if (session) {
-    unsavedSessions.add(sessionId)
-    if (deletingSessions.has(sessionId)) {
-      return
-    }
-    const epoch = historyEpoch
-    const files = pendingFiles.get(sessionId)
-    void db
-      .saveSession(session, files)
-      .then(() => {
-        if (epoch !== historyEpoch || !getSession(sessionId)) {
-          return
-        }
-        if (pendingFiles.get(sessionId) === files) {
-          pendingFiles.delete(sessionId)
-        }
-        if (getSession(sessionId) === session) {
-          unsavedSessions.delete(sessionId)
-          set((state) => ({
-            sessionSaveErrors: Object.fromEntries(
-              Object.entries(state.sessionSaveErrors).filter(([id]) => id !== sessionId)
-            ),
-          }))
-          trimSessionCache()
-        }
-      })
-      .catch((error: unknown) => {
-        db.reportStorageError('save session')(error)
-        if (epoch === historyEpoch && getSession(sessionId)) {
-          set((state) => ({
-            sessionSaveErrors: { ...state.sessionSaveErrors, [sessionId]: true },
-          }))
-        }
-      })
+  if (!session) {
+    return
   }
+  unsavedSessions.add(sessionId)
+  if (deletingSessions.has(sessionId)) {
+    return
+  }
+  const epoch = historyEpoch
+  const files = pendingFiles.get(sessionId)
+  const task = (saveQueues.get(sessionId) ?? Promise.resolve())
+    .then(() => {
+      // 整库替换（导入/清空）之后，排队中的旧快照不再写回，避免把已删除的会话复活
+      if (epoch !== historyEpoch) {
+        return
+      }
+      return db.saveSession(session, files)
+    })
+    .then(() => {
+      if (epoch !== historyEpoch || !getSession(sessionId)) {
+        return
+      }
+      if (pendingFiles.get(sessionId) === files) {
+        pendingFiles.delete(sessionId)
+      }
+      if (getSession(sessionId) === session) {
+        unsavedSessions.delete(sessionId)
+        set((state) => ({
+          sessionSaveErrors: Object.fromEntries(
+            Object.entries(state.sessionSaveErrors).filter(([id]) => id !== sessionId)
+          ),
+        }))
+        trimSessionCache()
+      }
+    })
+    .catch((error: unknown) => {
+      db.reportStorageError('save session')(error)
+      if (epoch === historyEpoch && getSession(sessionId)) {
+        set((state) => ({
+          sessionSaveErrors: { ...state.sessionSaveErrors, [sessionId]: true },
+        }))
+      }
+    })
+  saveQueues.set(sessionId, task)
+  // 队列跑完就释放，避免长时间使用后 Map 里堆积无用的 Promise
+  void task.finally(() => {
+    if (saveQueues.get(sessionId) === task) {
+      saveQueues.delete(sessionId)
+    }
+  })
 }
 
 export const retrySaveSessions = () => {
@@ -478,6 +499,7 @@ export const replaceHistory = async (write: () => Promise<void>): Promise<number
     sessionAccess.clear()
     unsavedSessions.clear()
     pendingFiles.clear()
+    saveQueues.clear()
     compactionFloorAt.clear()
     clearAllDrafts()
     set({
