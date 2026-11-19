@@ -192,6 +192,20 @@
   background-color: var(--dsw-alias-state-error-primary);
 }
 
+/* 触屏设备没有 hover，删除按钮必须常显，否则移动端看不到叉号 */
+@media (hover: none) {
+  .remove {
+    opacity: 1;
+  }
+
+  /* 视觉尺寸不变，向外扩大触摸热区（贴边部分被卡片圆角裁掉也无妨） */
+  .remove::after {
+    content: '';
+    position: absolute;
+    inset: -7px;
+  }
+}
+
 .textareaWrapper {
   position: relative;
   width: 100%;

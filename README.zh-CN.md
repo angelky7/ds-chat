@@ -43,20 +43,7 @@ pnpm build
 - 附件上传、粘贴与拖拽，语音输入和回复朗读；移动端录音时输入框首行显示实时频谱。
 - Markdown、代码高亮、KaTeX 公式和 Mermaid 图表。
 - 多家模型服务商：DeepSeek、Kimi、GLM、MiMo、通义千问、OpenRouter，各自独立保存 API Key。
-- 多家模型服务商：DeepSeek、Kimi、GLM、MiMo、通义千问、OpenRouter，各自独立保存 API Key。
 - 简体中文与英文、浅色与深色主题、移动端布局、位置设置、历史导入导出。
-
-## 安卓 App
-
-仓库里的 `android/` 是一个零依赖的 WebView 外壳：启动后直接打开线上站点，与浏览器同源，因此跨域、localStorage、IndexedDB 的行为和网页版完全一致。它不是一个「内置一份代码、需要重新打包才能更新」的离线包——站点更新后 App 里刷新即可。
-
-- **下载安装**：<https://github.com/angelky7/ds-chat/releases/download/android-latest/ds-chat.apk>（约 35 KB，每次推送 `android/` 由 CI 自动重建）
-- 支持：返回键回退、站外链接（如「获取 API Key」）跳系统浏览器、文件选择（头像与附件上传）、断网时显示重试页
-- 最低系统：Android 7.0（API 24）
-
-构建由 `.github/workflows/android.yml` 完成：安装 JDK 17 与 Android SDK 34，`gradle assembleDebug` 产出 APK，再用 `aapt` 校验包名、启动 Activity、应用名、图标与网络权限，全部通过才发布到 Release。用 debug 签名，个人安装无需额外配置。
-
-想改包名、应用名或启动页地址，编辑 `android/app/build.gradle` 与 `android/app/src/main/java/com/angelky/dschat/MainActivity.java` 里的 `HOME_URL`，推送后 CI 会自动出新包。
 
 ## 模型服务
 

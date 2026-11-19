@@ -46,20 +46,7 @@ The bundle has no backend dependency, so GitHub Pages, Cloudflare Pages, and sim
 - Upload, paste, or drag and drop attachments; use voice input and read replies aloud. A live audio spectrum appears in the first row of the input area while recording on mobile.
 - Markdown, syntax highlighting, KaTeX math, and Mermaid diagrams.
 - Multiple providers (DeepSeek, Kimi, MiMo, Qwen, SiliconFlow, OpenRouter), each with its own API Key.
-- Multiple providers (DeepSeek, Kimi, MiMo, Qwen, SiliconFlow, OpenRouter), each with its own API Key.
 - Simplified Chinese and English, light and dark themes, mobile layouts, location settings, and chat history import and export.
-
-## Android app
-
-`android/` holds a dependency-free WebView shell. It opens the live site on launch, so the app shares the browser's origin: cross-origin behaviour, localStorage and IndexedDB match the web version. It does not bundle a copy of the site, so site updates need no new APK.
-
-- **Download**: <https://github.com/angelky7/ds-chat/releases/download/android-latest/ds-chat.apk> (~35 KB, rebuilt by CI whenever `android/` changes)
-- Supports the back button, external links (such as "Get API Key") opening in the browser, file picking for avatars and attachments, and an offline page with retry
-- Minimum: Android 7.0 (API 24)
-
-`.github/workflows/android.yml` installs JDK 17 and Android SDK 34, runs `gradle assembleDebug`, then verifies package name, launcher activity, app label, icons and the INTERNET permission with `aapt` before publishing to a Release. The APK is debug-signed so it installs without extra setup.
-
-To change the package name, app label or launch URL, edit `android/app/build.gradle` and `HOME_URL` in `MainActivity.java`, then push — CI rebuilds automatically.
 
 ## Providers
 

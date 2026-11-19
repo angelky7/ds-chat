@@ -1,4 +1,0 @@
-// 只做一层 WebView 外壳：构建脚本保持最小依赖，CI 里几百秒即可出包
-plugins {
-    id 'com.android.application' version '8.5.2' apply false
-}
