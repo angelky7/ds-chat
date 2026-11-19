@@ -9,7 +9,13 @@ import {
 } from '../base/icons.js'
 import { setSearch, setThinking, useSettings } from '../../services/settings.js'
 import { useIsMobile } from '../../app/viewport.js'
-import { sendMessage, stopReply, useChatStore } from '../../services/chat/store.js'
+import {
+  cancelEditingMessage,
+  sendEditedMessage,
+  sendMessage,
+  stopReply,
+  useChatStore,
+} from '../../services/chat/store.js'
 import {
   addDraftFiles,
   EMPTY_DRAFT,
@@ -58,6 +64,10 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
   )
   const thinking = useSettings((state) => state.thinking)
   const importingHistory = useChatStore((state) => state.importingHistory)
+  // 编辑态：某条已发送消息的内容与附件已载入当前草稿
+  const editing = useChatStore(
+    (state) => sessionId !== null && state.editingMessage?.sessionId === sessionId
+  )
   const isMobile = useIsMobile()
   const search = useSettings((state) => state.search)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -149,6 +159,13 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
   // 移动端录音时用频谱替代输入框内容
   const recording = voice.status === 'recording'
 
+  // 进入编辑态时把光标放进输入框，用户可以直接改文字
+  useEffect(() => {
+    if (editing) {
+      textareaRef.current?.focus({ preventScroll: true })
+    }
+  }, [editing])
+
   // 排队、上传中或上传失败的附件都留在输入框，全部上传成功后才能发送
   const canSend = !importingHistory && !streaming && voice.status === 'idle' && draftReady
 
@@ -161,7 +178,11 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
       return
     }
     // 文本与上传完成态由提交动作读取最新快照，不使用上一次渲染的草稿。
-    if (!ensureApiKey() || !sendMessage(sessionId)) {
+    if (!ensureApiKey()) {
+      return
+    }
+    // 编辑态提交为「原消息的新版本」，普通发送追加到当前路径末尾
+    if (!(editing ? sendEditedMessage() : sendMessage(sessionId))) {
       return
     }
     stopReadAloud()
@@ -181,6 +202,14 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
         }
       }}
     >
+      {editing ? (
+        <div className={styles.editBar}>
+          <span className={styles.editBarText}>{t('chatEditingMessage')}</span>
+          <button type="button" className={styles.editBarCancel} onClick={cancelEditingMessage}>
+            {t('chatCancelEdit')}
+          </button>
+        </div>
+      ) : null}
       <DraftAttachments items={attachments} onRetry={retryFile} onRemove={removeFile} />
       <div className={styles.textareaWrapper}>
         <textarea

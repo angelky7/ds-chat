@@ -23,7 +23,11 @@ import {
   clearDraft,
   clearSentDraft,
   getDraft,
+  loadMessageDraft,
   prepareDraftMessage,
+  setDraft,
+  snapshotDraft,
+  type Draft,
 } from './drafts.js'
 import { createLatestReminder } from './latestReminder.js'
 import {
@@ -132,6 +136,10 @@ type ChatState = {
   streaming: Record<string, AbortController>
   /** 正在压缩上下文的会话，用于按钮与提示的忙碌态 */
   compacting: Record<string, boolean>
+  /** 正在编辑的消息：内容与附件已载入输入框，发送后作为新版本 */
+  editingMessage: { sessionId: string; messageId: string } | null
+  /** 搜索结果要求定位的消息：会话渲染后滚动到它并清除 */
+  pendingMessageId: string | null
 }
 
 export const useChatStore = create<ChatState>(() => ({
@@ -145,12 +153,18 @@ export const useChatStore = create<ChatState>(() => ({
   activeId: null,
   streaming: {},
   compacting: {},
+  editingMessage: null,
+  pendingMessageId: null,
 }))
 
 const { getState: get, setState: set } = useChatStore
 
+/** 置顶在前，其余按更新时间倒序；置顶会话收到新消息也不会掉出置顶组 */
 const sortSessions = (sessions: SessionSummary[]) =>
-  [...sessions].sort((a, b) => b.updatedAt - a.updatedAt)
+  [...sessions].sort(
+    (a, b) =>
+      Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || b.updatedAt - a.updatedAt
+  )
 
 const getSession = (id: string) => {
   const cache = get().sessionCache
@@ -163,7 +177,10 @@ const getStreamController = (id: string) => {
 }
 
 const sameSummary = (a: SessionSummary, b: SessionSummary) =>
-  a.title === b.title && a.createdAt === b.createdAt && a.updatedAt === b.updatedAt
+  a.title === b.title &&
+  a.createdAt === b.createdAt &&
+  a.updatedAt === b.updatedAt &&
+  Boolean(a.pinned) === Boolean(b.pinned)
 
 const sessionAccess = new Map<string, number>()
 const unsavedSessions = new Set<string>()
@@ -502,6 +519,7 @@ export const replaceHistory = async (write: () => Promise<void>): Promise<number
     saveQueues.clear()
     compactionFloorAt.clear()
     clearAllDrafts()
+    editingBackups.clear()
     set({
       ready: true,
       initError: false,
@@ -510,6 +528,8 @@ export const replaceHistory = async (write: () => Promise<void>): Promise<number
       sessionLoadErrors: {},
       sessionSaveErrors: {},
       activeId: null,
+      // 整库替换后原来的编辑目标可能已不存在
+      editingMessage: null,
     })
     return summaries.length
   } finally {
@@ -525,8 +545,20 @@ export const replaceHistory = async (write: () => Promise<void>): Promise<number
   }
 }
 
+/**
+ * 切换对话前退出编辑态：编辑内容占着当前会话的草稿，直接切走会把用户原来没发出去的内容挤掉，
+ * 所以先还原成编辑前的草稿。
+ */
+const leaveEditing = (target: string | null) => {
+  const editing = get().editingMessage
+  if (editing && editing.sessionId !== target) {
+    cancelEditingMessage()
+  }
+}
+
 export const newChat = () => {
   if (!get().importingHistory) {
+    leaveEditing(null)
     set({ activeId: null })
     trimSessionCache()
   }
@@ -534,11 +566,21 @@ export const newChat = () => {
 
 export const selectSession = (id: string) => {
   if (!get().importingHistory && get().sessions.some((session) => session.id === id)) {
+    leaveEditing(id)
     touchSession(id)
     set({ activeId: id })
     void ensureSessionLoaded(id)
     trimSessionCache()
   }
+}
+
+/**
+ * 从搜索结果跳转：打开该会话，并标记要滚动到的消息。
+ * 消息可能还没渲染，由消息列表在渲染后消费并清除标记。
+ */
+export const revealMessage = (sessionId: string, messageId: string | null) => {
+  selectSession(sessionId)
+  set({ pendingMessageId: messageId })
 }
 
 export const renameSession = (id: string, title: string) => {
@@ -560,6 +602,37 @@ export const renameSession = (id: string, title: string) => {
     }))
     void db.renameSession(id, title).catch(db.reportStorageError('rename session'))
   }
+}
+
+/**
+ * 置顶 / 取消置顶。已打开的会话走内存更新（随后由 persist 一并落盘），
+ * 未打开的会话直接改库，避免为了一个布尔字段把整段消息读进内存。
+ */
+export const setSessionPinned = (id: string, pinned: boolean) => {
+  if (get().importingHistory || deletingSessions.has(id)) {
+    return
+  }
+  if (getSession(id)) {
+    updateSession(id, (session) => ({ ...session, pinned }))
+    persist(id)
+    return
+  }
+  set((state) => ({
+    sessions: sortSessions(
+      state.sessions.map((session) => (session.id === id ? { ...session, pinned } : session))
+    ),
+  }))
+  void db.setSessionPinned(id, pinned).catch((error: unknown) => {
+    db.reportStorageError('pin session')(error)
+    // 写库失败时回滚列表，避免界面显示成已置顶但刷新后回落
+    set((state) => ({
+      sessions: sortSessions(
+        state.sessions.map((session) =>
+          session.id === id ? { ...session, pinned: !pinned } : session
+        )
+      ),
+    }))
+  })
 }
 
 /**
@@ -594,6 +667,7 @@ const removeSessionData = async (id: string): Promise<boolean> => {
     unsavedSessions.delete(id)
     pendingFiles.delete(id)
     clearDraft(id)
+    editingBackups.delete(id)
     set((state) => ({
       sessions: state.sessions.filter((session) => session.id !== id),
       sessionCache: Object.fromEntries(
@@ -606,6 +680,8 @@ const removeSessionData = async (id: string): Promise<boolean> => {
         Object.entries(state.sessionSaveErrors).filter(([key]) => key !== id)
       ),
       activeId: state.activeId === id ? null : state.activeId,
+      // 正在编辑的就是这个会话时一并退出编辑态
+      editingMessage: state.editingMessage?.sessionId === id ? null : state.editingMessage,
     }))
     return true
   } catch (error) {
@@ -830,36 +906,135 @@ export const regenerateReply = (sessionId: string, messageId?: string) => {
   void streamReply(sessionId, reply, { history, question })
 }
 
-/** 编辑提问后新增同父版本，保留原文件；旧问题的所有回答与后续对话仍可切回。 */
-export const editMessage = (sessionId: string, messageId: string, content: string): boolean => {
-  if (get().importingHistory || deletingSessions.has(sessionId)) {
+/** 编辑前的草稿备份：取消编辑时原样恢复，按会话存 */
+const editingBackups = new Map<string, Draft>()
+
+/**
+ * 载入一条已发送消息进入编辑态：文字与附件回到输入框，附件可增可删。
+ * 附件原件从 IndexedDB 取；需要时重新上传或重新解析，取消时全部还原。
+ */
+export const startEditingMessage = async (
+  sessionId: string,
+  messageId: string
+): Promise<boolean> => {
+  if (get().importingHistory || deletingSessions.has(sessionId) || getStreamController(sessionId)) {
+    return false
+  }
+  const session = getSession(sessionId)
+  if (!session) {
+    return false
+  }
+  const target = getVisibleMessages(session).find((message) => message.id === messageId)
+  if (target?.role !== 'user') {
+    return false
+  }
+  // 先备份用户正在输入的内容，取消编辑时原样还回去
+  editingBackups.set(sessionId, snapshotDraft(sessionId))
+  const missing = await loadMessageDraft(
+    sessionId,
+    target.content,
+    target.files,
+    activeApiKey(),
+    !activeProvider().capabilities.files
+  )
+  set({ editingMessage: { sessionId, messageId } })
+  if (missing > 0) {
+    // 归档可能只带文件信息、没有原件；这类附件无法随编辑一起重发
+    showToast({ key: 'chatEditMissingFiles', params: { count: missing } })
+  }
+  return true
+}
+
+/** 放弃编辑：释放编辑态附件的预览与上传，恢复编辑前的草稿 */
+export const cancelEditingMessage = () => {
+  const editing = get().editingMessage
+  if (!editing) {
+    return
+  }
+  const { sessionId } = editing
+  clearDraft(sessionId)
+  const backup = editingBackups.get(sessionId)
+  editingBackups.delete(sessionId)
+  if (backup) {
+    setDraft(sessionId, backup)
+  }
+  set({ editingMessage: null })
+}
+
+/**
+ * 提交编辑：按输入框当前内容（含增删后的附件）生成一条新提问，接在原提问的父节点下，
+ * 作为该轮的新版本；旧提问及其回答仍可切回，不会被删除。
+ */
+export const sendEditedMessage = (): boolean => {
+  const editing = get().editingMessage
+  if (!editing || get().importingHistory || !get().ready) {
+    return false
+  }
+  const { sessionId, messageId } = editing
+  if (deletingSessions.has(sessionId)) {
     return false
   }
   const session = getSession(sessionId)
   if (!session || getStreamController(sessionId)) {
     return false
   }
-  const path = getVisibleMessages(session)
-  const index = path.findIndex((message) => message.id === messageId)
-  const previous = path[index]
-  const text = content.trim()
-  if (previous?.role !== 'user' || (!text && previous.files.length === 0)) {
+  const prepared = prepareDraftMessage(
+    getDraft(sessionId),
+    useUploads.getState().tasks,
+    !activeProvider().capabilities.files
+  )
+  if (!prepared) {
     return false
   }
+  const { text, files } = prepared
+  const messageTokens =
+    estimateTokens(text) +
+    files.reduce((sum, file) => sum + (file.text ? estimateTokens(file.text) : 64), 0)
+  if (messageTokens >= contextWindowOf(activeProvider().model)) {
+    showToast({ key: 'chatMessageOverWindow' })
+    return false
+  }
+  const path = getVisibleMessages(session)
+  const index = path.findIndex((message) => message.id === messageId)
+  if (index < 0 || path[index]?.role !== 'user') {
+    return false
+  }
+  const history = path.slice(0, index)
   const question: UserMessage = {
     id: createId(),
     role: 'user',
     content: text,
-    files: previous.files,
+    files: files.map(({ id, serverId, name, size, isImage, mimeType, text: documentText }) => ({
+      id,
+      serverId,
+      name,
+      size,
+      isImage,
+      mimeType,
+      ...(documentText ? { text: documentText } : {}),
+    })),
     createdAt: Date.now(),
   }
   const reply = createReply()
-  updateSession(sessionId, (s) => ({
-    ...appendBranch(s, path[index - 1]?.id ?? null, [question, reply]),
+  updateSession(sessionId, (current) => ({
+    ...appendBranch(current, path[index - 1]?.id ?? null, [question, reply]),
     updatedAt: Date.now(),
   }))
+  if (files.length > 0) {
+    pendingFiles.set(sessionId, [
+      ...(pendingFiles.get(sessionId) ?? []),
+      ...files.map(({ id, blob }) => ({ id, blob })),
+    ])
+  }
   persist(sessionId)
-  void streamReply(sessionId, reply, { history: path.slice(0, index), question })
+  clearSentDraft(sessionId)
+  editingBackups.delete(sessionId)
+  set({ editingMessage: null })
+  void streamReply(sessionId, reply, {
+    history,
+    question,
+    blobs: new Map<string, Blob>(files.map((file): [string, Blob] => [file.id, file.blob])),
+  })
   return true
 }
 

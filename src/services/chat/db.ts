@@ -147,6 +147,56 @@ export const renameSession = async (id: string, title: string): Promise<void> =>
   ])
 }
 
+/**
+ * 置顶/取消置顶：未打开的会话也要能操作，所以直接改库。
+ * 会话正文与列表元数据必须同事务写，否则下次保存会用旧 pinned 覆盖列表。
+ */
+export const setSessionPinned = async (id: string, pinned: boolean): Promise<void> => {
+  const tx = (await getDB()).transaction(['sessions', 'sessionSummaries'], 'readwrite')
+  await Promise.all([
+    (async () => {
+      try {
+        const sessions = tx.objectStore('sessions')
+        const session = await sessions.get(id)
+        if (!session) {
+          return
+        }
+        const next: Session = { ...session, pinned }
+        await sessions.put(next)
+        await tx.objectStore('sessionSummaries').put(storedSummary(next))
+      } catch (error) {
+        abortTransaction(tx)
+        throw error
+      }
+    })(),
+    tx.done,
+  ])
+}
+
+/**
+ * 只读遍历全部会话：搜索用。用游标逐条读取，避免把所有会话一次性读进内存。
+ * visit 返回 false 时提前结束（只读事务会被中止，不产生副作用）。
+ */
+export const forEachSession = async (
+  visit: (session: Session) => boolean | undefined
+): Promise<void> => {
+  const database = await getDB()
+  const tx = database.transaction('sessions', 'readonly')
+  // 提前结束时事务被 abort，tx.done 会 reject；这里统一吞掉
+  const done = tx.done.catch(() => undefined)
+  let stopped = false
+  for (let cursor = await tx.store.openCursor(); cursor; cursor = await cursor.continue()) {
+    if (visit(cursor.value as Session) === false) {
+      stopped = true
+      break
+    }
+  }
+  if (stopped) {
+    abortTransaction(tx)
+  }
+  await done
+}
+
 /** 删除会话，仅清理已无会话引用的本地原件；远端文件不删。 */
 export const deleteSession = async (sessionId: string): Promise<void> => {
   const tx = (await getDB()).transaction(['sessions', 'sessionSummaries', 'files'], 'readwrite')

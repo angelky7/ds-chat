@@ -19,6 +19,8 @@ import { MobileHeader } from '../components/session/MobileHeader.js'
 import { Welcome } from '../components/session/Welcome.js'
 import { ensureApiKey } from '../components/settings/settingsDialogState.js'
 import { SettingsDialog } from '../components/settings/SettingsDialog.js'
+import { HistorySearch } from '../components/search/HistorySearch.js'
+import { openHistorySearch } from '../components/search/historySearchState.js'
 import { Toast } from '../components/base/Toast.js'
 import { showToast } from '../components/base/toastState.js'
 import { onUploadNotice } from '../services/attachments.js'
@@ -93,6 +95,18 @@ export const App = () => {
     ensureApiKey()
   }, [])
 
+  // Ctrl/Cmd+K 打开历史搜索，与侧边栏入口共用同一个弹窗
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        openHistorySearch()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
   return (
     <>
       <div ref={frameRef} className={styles.frame}>
@@ -161,6 +175,7 @@ export const App = () => {
         {/* 移动端设置是全屏页面，放在 frame 内才能跟着可视视口收缩 */}
         <SettingsDialog />
       </div>
+      <HistorySearch />
       <Toast />
     </>
   )

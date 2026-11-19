@@ -2,7 +2,12 @@ import clsx from 'clsx'
 import { useEffect, useMemo, useState } from 'react'
 import { brandLogo, brandName, useBrand } from '../../app/brand.js'
 import { useTranslate } from '../../i18n/index.js'
-import { IconPanelLeftOutline16, IconSettingsOutline16, NewChatIcon } from '../base/icons.js'
+import {
+  IconPanelLeftOutline16,
+  IconSearchOutline16,
+  IconSettingsOutline16,
+  NewChatIcon,
+} from '../base/icons.js'
 import { setSiderCollapsed } from '../../services/settings.js'
 import { groupSessions } from '../../services/chat/sessionGroups.js'
 import { newChat, removeSession, useChatStore } from '../../services/chat/store.js'
@@ -11,6 +16,7 @@ import { Button } from '../base/Button.js'
 import { IconButton } from '../base/IconButton.js'
 import { Modal } from '../base/Modal.js'
 import { showToast } from '../base/toastState.js'
+import { openHistorySearch } from '../search/historySearchState.js'
 import { openSettings } from '../settings/settingsDialogState.js'
 import { closeMobileSider, useMobileSider } from './mobileSiderState.js'
 import { SessionItem } from './SessionItem.js'
@@ -78,6 +84,17 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
           <NewChatIcon />
         </span>
         {t('newChat')}
+      </button>
+      <button
+        type="button"
+        className={styles.searchEntry}
+        onClick={() => {
+          openHistorySearch()
+          closeMobileSider()
+        }}
+      >
+        <IconSearchOutline16 />
+        {t('searchHistory')}
       </button>
       <div className={styles.listWrap}>
         <div className={styles.list}>

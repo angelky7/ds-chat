@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { TranslationMessage } from '../../i18n/index.js'
 import { createId } from '../../utils/id.js'
 import { prepareImageFile } from '../../utils/image.js'
+import * as db from './db.js'
 import {
   cancelUpload,
   getExtension,
@@ -27,7 +28,7 @@ export type DraftAttachment = {
   text?: string
 }
 
-type Draft = { text: string; attachments: DraftAttachment[] }
+export type Draft = { text: string; attachments: DraftAttachment[] }
 
 export const EMPTY_DRAFT: Draft = { text: '', attachments: [] }
 
@@ -53,6 +54,16 @@ const updateDraft = (sessionId: string | null, update: (draft: Draft) => Draft) 
 
 export const setDraftText = (sessionId: string | null, text: string) =>
   updateDraft(sessionId, (draft) => ({ ...draft, text }))
+
+/** 整体替换草稿：编辑消息时把该条消息的文字与附件载入输入框 */
+export const setDraft = (sessionId: string | null, draft: Draft) =>
+  updateDraft(sessionId, () => draft)
+
+/** 浅拷贝当前草稿，供编辑前备份；附件对象不可变，共享引用即可 */
+export const snapshotDraft = (sessionId: string | null): Draft => {
+  const draft = getDraft(sessionId)
+  return { text: draft.text, attachments: [...draft.attachments] }
+}
 
 const upload = (attachment: DraftAttachment, apiKey: string) => {
   // 上传任务负责记录错误，输入框的附件卡片展示失败及重试入口。
@@ -285,4 +296,52 @@ export const clearAllDrafts = () => {
     draft.attachments.forEach((attachment) => releaseAttachment(attachment, true))
   }
   useDrafts.setState({ drafts: new Map() })
+}
+
+/**
+ * 把一条已发送的消息还原成可编辑草稿（编辑时载入输入框）。
+ * 原件从 IndexedDB 取回；已有 serverId 的附件直接标记为上传完成，不会重复上传。
+ * 返回原件已不在本机的附件数量，调用方据此提示用户。
+ */
+export const loadMessageDraft = async (
+  sessionId: string,
+  text: string,
+  files: FileAttachment[],
+  apiKey: string,
+  inline: boolean
+): Promise<number> => {
+  const attachments: DraftAttachment[] = []
+  let missing = 0
+  for (const file of files) {
+    const blob = await db.loadFile(file.id)
+    if (!blob) {
+      // 导入的归档可能只带文件信息、没有原件；这类附件无法重新发送
+      missing += 1
+      continue
+    }
+    const attachment: DraftAttachment = {
+      id: file.id,
+      file: new File([blob], file.name || 'attachment', {
+        type: file.mimeType || blob.type || '',
+      }),
+      isImage: file.isImage,
+      previewUrl: file.isImage ? URL.createObjectURL(blob) : null,
+      ...(file.text ? { text: file.text } : {}),
+    }
+    attachments.push(attachment)
+    const serverId = file.serverId
+    if (serverId) {
+      useUploads.setState((state) => ({
+        tasks: { ...state.tasks, [file.id]: { status: 'done', serverId } },
+      }))
+    } else if (!inline) {
+      // 当前服务商走 Files API 但这条附件没有 file_id：按新附件重新上传
+      upload(attachment, apiKey)
+    } else if (!file.isImage && !attachment.text?.trim()) {
+      // 内联模式下的文档缺少解析结果（例如从归档导入）：重新在本地抽文字
+      extract(sessionId, attachment)
+    }
+  }
+  updateDraft(sessionId, () => ({ text, attachments }))
+  return missing
 }

@@ -27,6 +27,9 @@ const string: Read<string> = (value) => (typeof value === 'string' ? value : inv
 
 const boolean: Read<boolean> = (value) => (typeof value === 'boolean' ? value : invalid())
 
+/** 可选布尔：旧归档没有置顶字段，缺省视为未置顶；存在时必须真的是布尔 */
+const optionalBoolean: Read<boolean> = (value) => (value === undefined ? false : boolean(value))
+
 const number: Read<number> = (value) =>
   typeof value === 'number' && Number.isFinite(value) ? value : invalid()
 
@@ -242,7 +245,7 @@ export const readSessionIndex: Read<SessionIndexEntry[]> = list((value) => {
   return {
     id: sessionId(item.id),
     title: nullable(string)(item.title),
-    pinned: false,
+    pinned: optionalBoolean(item.pinned),
     message_count: count(item.message_count),
     inserted_at: time(item.inserted_at),
     updated_at: time(item.updated_at),
@@ -254,7 +257,7 @@ export const readSessionFile: Read<SessionFile> = (value) => {
   return {
     id: sessionId(item.id),
     title: nullable(string)(item.title),
-    pinned: false,
+    pinned: optionalBoolean(item.pinned),
     current_message_id: count(item.current_message_id),
     inserted_at: time(item.inserted_at),
     updated_at: time(item.updated_at),

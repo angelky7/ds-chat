@@ -14,6 +14,35 @@
   overflow: hidden;
 }
 
+/* 编辑态提示条：说明发送会生成新版本，并提供退出入口 */
+.editBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 10px 12px 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-3);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.editBarText {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.editBarCancel {
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--dsw-alias-brand-text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
 .session {
   box-shadow:
     0 4px 10px rgba(0, 0, 0, 0.02),

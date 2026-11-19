@@ -6,10 +6,18 @@ const DAY = 86_400_000
 
 const startOfDay = (time: number) => new Date(time).setHours(0, 0, 0, 0)
 
-/** 分组：今天 / 昨天 / 7 天内 / 30 天内 / 按月 */
+/** 分组：置顶 / 今天 / 昨天 / 7 天内 / 30 天内 / 按月 */
 export const groupSessions = (sessions: SessionSummary[], now: number, t = translate) => {
   const groups: { key: string; label: string; sessions: SessionSummary[] }[] = []
+  // 置顶会话独立成组，固定在最前；其余仍按更新时间分组，置顶项不参与时间分组
+  const pinned = sessions.filter((session) => session.pinned)
+  if (pinned.length > 0) {
+    groups.push({ key: 'pinned', label: t('sessionGroupPinned'), sessions: pinned })
+  }
   for (const session of sessions) {
+    if (session.pinned) {
+      continue
+    }
     const diff = Math.floor((now - startOfDay(session.updatedAt)) / DAY)
     const key =
       diff <= 0

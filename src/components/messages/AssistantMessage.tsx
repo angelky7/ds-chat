@@ -73,7 +73,7 @@ export const AssistantMessage = memo(function AssistantMessage({
   const compacting = useChatStore((state) => Boolean(state.compacting[sessionId]))
   const summaryEntry = `${message.id}-summary`
   return (
-    <div className={styles.message}>
+    <div className={styles.message} data-message-id={message.id}>
       {showAvatars ? <Avatar role="assistant" src={avatar} className={styles.avatar} /> : null}
       <div className={styles.body}>
         <div className={clsx(styles.content, bubble && styles.contentBubble)}>

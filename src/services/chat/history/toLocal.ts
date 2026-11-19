@@ -288,6 +288,8 @@ export const toLocalSession = (file: SessionFile): LocalSession => {
     title: file.title ?? '',
     createdAt: time(file.inserted_at),
     updatedAt: time(file.updated_at),
+    // 只在置顶时写字段，未置顶的会话保持与旧数据相同的形状
+    ...(file.pinned ? { pinned: true } : {}),
     ...buildTree(file),
   }
   const images = new Map<string, string>()

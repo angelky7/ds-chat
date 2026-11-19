@@ -302,6 +302,14 @@ export const IconThinkOutline16 = () => (
   </svg>
 )
 
+/** 置顶：向上箭头加底线，与项目其余图标的填充风格保持一致 */
+export const IconPinOutline16 = () => (
+  <svg width={16} height={16} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M8 1.6L12.4 6.1H9.35V10.4H6.65V6.1H3.6L8 1.6Z" fill="currentColor" />
+    <path d="M2.6 12.2H13.4V13.8H2.6V12.2Z" fill="currentColor" />
+  </svg>
+)
+
 export const IconTrashOutline16 = () => (
   <svg width={16} height={16} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path

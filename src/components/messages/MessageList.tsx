@@ -5,7 +5,7 @@ import {
   getVisibleMessages,
   type MessageVersions,
 } from '../../services/chat/branches.js'
-import { selectMessageVersion } from '../../services/chat/store.js'
+import { selectMessageVersion, useChatStore } from '../../services/chat/store.js'
 import type { Session } from '../../services/chat/types.js'
 import { closeSearchPanel } from '../search/searchPanelState.js'
 import { AssistantMessage } from './AssistantMessage.js'
@@ -67,6 +67,22 @@ export const MessageList = ({
       scrollTopRef.current = el.scrollTop
     }
   }, [])
+
+  // 搜索结果跳转：等目标消息渲染出来后滚动到它，然后清掉标记
+  const pendingMessageId = useChatStore((state) => state.pendingMessageId)
+  useEffect(() => {
+    if (!pendingMessageId) {
+      return
+    }
+    const node = contentRef.current?.querySelector(`[data-message-id="${pendingMessageId}"]`)
+    if (node) {
+      node.scrollIntoView({ block: 'center' })
+      useChatStore.setState({ pendingMessageId: null })
+    } else if (messages.length > 0) {
+      // 会话已渲染但没有这条消息（不在当前分支上），放弃定位，避免标记一直挂着
+      useChatStore.setState({ pendingMessageId: null })
+    }
+  }, [pendingMessageId, messages.length])
 
   // 内容、键盘和输入框高度变化时，继续遵循当前跟随状态。
   useLayoutEffect(() => {
