@@ -1582,9 +1582,13 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
               }
             : {
                 max_tokens: MAX_OUTPUT_TOKENS,
-                ...(provider.capabilities.thinking && initial.thinking
-                  ? { thinking: { type: 'enabled' as const } }
-                  : {}),
+                // DeepSeek 的思考模式默认开启，关闭时必须显式传 disabled；
+                // 其它服务商默认关闭，只在开启时传，避免不认识该字段的接口报错。
+                ...(provider.id === 'deepseek'
+                  ? { thinking: { type: initial.thinking ? ('enabled' as const) : ('disabled' as const) } }
+                  : provider.capabilities.thinking && initial.thinking
+                    ? { thinking: { type: 'enabled' as const } }
+                    : {}),
               }),
           ...(wantsServerTitle ? { title: { enabled: true } } : {}),
         }
