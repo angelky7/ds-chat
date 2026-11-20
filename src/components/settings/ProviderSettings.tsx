@@ -287,7 +287,6 @@ const ConnectionEditor = ({ provider }: { provider: ActiveProvider }) => {
   const [models, setModels] = useState<string[]>(provider.models)
   const [newModel, setNewModel] = useState('')
 
-  const blocked = provider.preset.corsBlocked?.includes(protocol) ?? false
 
   const addModel = () => {
     const value = newModel.trim()
@@ -328,20 +327,20 @@ const ConnectionEditor = ({ provider }: { provider: ActiveProvider }) => {
         </div>
       </Field>
 
-      <Field label={t('providerProtocol')}>
-        <Select
-          ariaLabel={t('providerProtocol')}
-          className={styles.select}
-          value={protocol}
-          options={[
-            { value: 'anthropic', label: t('providerProtocolAnthropic') },
-            { value: 'openai', label: t('providerProtocolOpenai') },
-          ]}
-          onChange={(value) => setProtocol(value as ProviderProtocol)}
-        />
-      </Field>
-
-      {blocked ? <div className={styles.warning}>{t('providerCorsWarning')}</div> : null}
+      {provider.preset.custom ? (
+        <Field label={t('providerProtocol')}>
+          <Select
+            ariaLabel={t('providerProtocol')}
+            className={styles.select}
+            value={protocol}
+            options={[
+              { value: 'anthropic', label: t('providerProtocolAnthropic') },
+              { value: 'openai', label: t('providerProtocolOpenai') },
+            ]}
+            onChange={(value) => setProtocol(value as ProviderProtocol)}
+          />
+        </Field>
+      ) : null}
 
       <Field label={t('providerModels')} hint={t('providerModelsHint')}>
         <div className={styles.modelChips}>

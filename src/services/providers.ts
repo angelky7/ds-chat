@@ -34,6 +34,13 @@ export type ProviderPreset = {
   /** 品牌名，中英文一致，不做翻译 */
   label: string
   protocol: ProviderProtocol
+  /**
+   * 该服务商实际支持的协议。官方入口按协议给了不同的路径前缀（DeepSeek 只有
+   * /anthropic、OpenRouter 只有 /chat/completions），切到另一种协议必然打到不存在的
+   * 地址，所以预设服务商只保留可用的那一个，界面上不再让用户选。
+   * 自定义服务商地址由用户自己填，两种都允许。
+   */
+  protocols: ProviderProtocol[]
   /** Anthropic 协议填到 /v1/messages 之前；OpenAI 协议填到 /chat/completions 之前 */
   baseUrl: string
   model: string
@@ -42,11 +49,6 @@ export type ProviderPreset = {
   capabilities: ProviderCapabilities
   /** 申请 Key 的地址；自定义服务商没有 */
   keysUrl: string
-  /**
-   * 实测不允许浏览器跨域直连的协议（预检没有 Access-Control-Allow-Origin）。
-   * 这些协议在纯静态部署下会被浏览器拦截，只能走自建反代。
-   */
-  corsBlocked?: ProviderProtocol[]
   /** 用户自定义，可删除 */
   custom?: boolean
 }
@@ -89,6 +91,7 @@ export const PROVIDERS: ProviderPreset[] = [
     label: 'DeepSeek',
     protocol: 'anthropic',
     // 官方 Anthropic 兼容入口，另带 Files API、联网搜索与语音工具
+    protocols: ['anthropic'],
     baseUrl: `${API_ORIGIN}/anthropic`,
     model: 'deepseek-flash',
     models: ['deepseek-flash', 'deepseek-v4-pro'],
@@ -102,11 +105,11 @@ export const PROVIDERS: ProviderPreset[] = [
     // OpenAI 兼容接口（/v1）预检正常，因此默认走这里。
     protocol: 'openai',
     baseUrl: 'https://api.moonshot.cn/v1',
+    protocols: ['openai'],
     model: 'kimi-latest',
     models: ['kimi-latest', 'kimi-k2-turbo-preview', 'kimi-k2-thinking'],
     capabilities: { ...chatOnlyCapabilities, thinking: false },
     keysUrl: 'https://platform.moonshot.cn/console/api-keys',
-    corsBlocked: ['anthropic'],
   },
   {
     id: 'mimo',
@@ -114,6 +117,7 @@ export const PROVIDERS: ProviderPreset[] = [
     // 预检返回 Access-Control-Allow-Origin: *，两种协议都可直连
     protocol: 'anthropic',
     baseUrl: 'https://api.xiaomimimo.com/anthropic',
+    protocols: ['anthropic'],
     model: 'mimo-v2.5-pro',
     models: ['mimo-v2.5-pro', 'mimo-v2.5'],
     capabilities: chatOnlyCapabilities,
@@ -126,11 +130,11 @@ export const PROVIDERS: ProviderPreset[] = [
     // OpenAI 兼容接口预检正常。
     protocol: 'openai',
     baseUrl: 'https://maas.qianwenaiapi.com/compatible-mode/v1',
+    protocols: ['openai'],
     model: 'qwen-plus',
     models: ['qwen-plus', 'qwen3-max', 'qwen3-coder-plus'],
     capabilities: { ...chatOnlyCapabilities, thinking: false },
     keysUrl: 'https://bailian.console.aliyun.com',
-    corsBlocked: ['anthropic'],
   },
   {
     id: 'siliconflow',
@@ -139,6 +143,7 @@ export const PROVIDERS: ProviderPreset[] = [
     // /v1/models 需要鉴权但确实存在，所以 Key 能在保存时校验
     protocol: 'openai',
     baseUrl: 'https://api.siliconflow.cn/v1',
+    protocols: ['openai'],
     model: 'deepseek-ai/DeepSeek-V3.2',
     models: [
       'deepseek-ai/DeepSeek-V3.2',
@@ -157,6 +162,7 @@ export const PROVIDERS: ProviderPreset[] = [
     // 只提供 OpenAI 兼容入口，预检允许跨域
     protocol: 'openai',
     baseUrl: 'https://openrouter.ai/api/v1',
+    protocols: ['openai'],
     model: 'openrouter/auto',
     models: ['openrouter/auto', 'anthropic/claude-sonnet-4.5', 'google/gemini-2.5-pro'],
     // 推理开关走 OpenRouter 的 reasoning 参数（见 api/openai.ts）
@@ -180,6 +186,8 @@ const toPreset = (item: CustomProvider): ProviderPreset => ({
   id: item.id,
   label: item.label,
   protocol: item.protocol,
+  // 地址由用户自己填，两种协议都允许
+  protocols: ['openai', 'anthropic'],
   baseUrl: item.baseUrl,
   model: item.model,
   models: item.models,
@@ -446,7 +454,9 @@ const FLASH_MODELS = new Set([
 export const resolveProvider = (id: ProviderId, model?: string): ActiveProvider => {
   const preset = findProvider(id)
   const config = configOf(id)
-  const protocol = config.protocol || preset.protocol
+  // 旧配置可能存了该服务商不支持的协议，按预设钳制，避免请求打到不存在的路径
+  const protocol =
+    config.protocol && preset.protocols.includes(config.protocol) ? config.protocol : preset.protocol
   const models = effectiveModels(id)
   const selectedModel = model?.trim() || models[0] || preset.model
   const capabilities = capabilitiesFor(preset, protocol)
@@ -571,10 +581,6 @@ export const removeCustomProvider = (id: ProviderId): boolean => {
         : state.selection,
   })
 }
-
-/** 当前协议是否被实测判定为浏览器无法直连（需要自建反代或换协议） */
-export const isCorsBlocked = (provider: ActiveProvider): boolean =>
-  provider.preset.corsBlocked?.includes(provider.protocol) ?? false
 
 /** 组件里订阅：选中项或任意服务商配置变化都会触发重新渲染 */
 export const useActiveProvider = (): ActiveProvider => {
