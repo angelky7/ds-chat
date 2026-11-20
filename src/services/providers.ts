@@ -163,8 +163,17 @@ export const PROVIDERS: ProviderPreset[] = [
     protocol: 'openai',
     baseUrl: 'https://openrouter.ai/api/v1',
     protocols: ['openai'],
-    model: 'openrouter/auto',
-    models: ['openrouter/auto', 'anthropic/claude-sonnet-4.5', 'google/gemini-2.5-pro'],
+    model: 'deepseek/deepseek-v4-pro-0813',
+    // 默认先给官方 DeepSeek 两个最新模型与两个免费的 Nemotron，其余常用模型跟在后面
+    models: [
+      'deepseek/deepseek-v4-pro-0813',
+      'deepseek/deepseek-v4.1-flash-1017',
+      'nvidia/nemotron-3.5-super-vl:free',
+      'nvidia/nemotron-3-ultra-550b-a55b:free',
+      'openrouter/auto',
+      'anthropic/claude-sonnet-4.5',
+      'google/gemini-2.5-pro',
+    ],
     // 推理开关走 OpenRouter 的 reasoning 参数（见 api/openai.ts）
     capabilities: { ...chatOnlyCapabilities, thinking: true },
     keysUrl: 'https://openrouter.ai/keys',
