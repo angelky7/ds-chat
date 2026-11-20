@@ -16,14 +16,32 @@ const useFileUrl = (id: string) => {
   useEffect(() => {
     let objectUrl: string | null = null
     let cancelled = false
-    loadFile(id).then((blob) => {
-      if (!cancelled) {
-        objectUrl = blob ? URL.createObjectURL(blob) : null
-        setFileUrl({ id, url: objectUrl })
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const startedAt = Date.now()
+    const load = async (): Promise<void> => {
+      const blob = await loadFile(id)
+      if (cancelled) {
+        return
       }
-    })
+      if (blob) {
+        objectUrl = URL.createObjectURL(blob)
+        setFileUrl({ id, url: objectUrl })
+        return
+      }
+      // 刚发出的消息：原件与消息在同一次写入里落库，渲染可能早一拍拿到空结果。
+      // 短暂重试几次再判为缺失，否则图片会先渲染成文件卡片且不再恢复。
+      if (Date.now() - startedAt < 4000) {
+        timer = setTimeout(() => void load(), 250)
+        return
+      }
+      setFileUrl({ id, url: null })
+    }
+    void load()
     return () => {
       cancelled = true
+      if (timer) {
+        clearTimeout(timer)
+      }
       if (objectUrl) {
         URL.revokeObjectURL(objectUrl)
       }
@@ -69,6 +87,10 @@ export const MessageFile = ({
 
   // 归档或旧数据可能漏了 isImage 标记：名字像图片、本地原件也在，就按图片渲染
   const looksLikeImage = file.isImage || looksLikeImageName(file.name)
+  // 原件还在读：先占位，避免图片先闪成文件卡片再变成缩略图
+  if (looksLikeImage && url === undefined) {
+    return <div className={clsx(styles.image, styles.imageThumb)} title={file.name} />
+  }
   if (looksLikeImage && url !== null) {
     const preview = url ? (
       failedUrl === url ? (
