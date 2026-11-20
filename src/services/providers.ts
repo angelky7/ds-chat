@@ -159,7 +159,8 @@ export const PROVIDERS: ProviderPreset[] = [
     baseUrl: 'https://openrouter.ai/api/v1',
     model: 'openrouter/auto',
     models: ['openrouter/auto', 'anthropic/claude-sonnet-4.5', 'google/gemini-2.5-pro'],
-    capabilities: { ...chatOnlyCapabilities, thinking: false },
+    // 推理开关走 OpenRouter 的 reasoning 参数（见 api/openai.ts）
+    capabilities: { ...chatOnlyCapabilities, thinking: true },
     keysUrl: 'https://openrouter.ai/keys',
   },
 ]

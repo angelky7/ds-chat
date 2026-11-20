@@ -1569,6 +1569,14 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
           provider.id === 'deepseek' || system.trim() !== DEEPSEEK_DEFAULT_PROMPT ? system : ''
         // 默认温度不发送，交给服务端；思考模式下服务端本身固定 1.0
         const temperature = useSettings.getState().temperature
+        // 思考开关：DeepSeek 与 OpenAI 兼容服务商默认可能开启推理，关闭时必须显式传；
+        // Anthropic 兼容的第三方（MiMo 等）默认关闭，只在开启时传，避免不认识 disabled。
+        const explicitThinking = provider.id === 'deepseek' || provider.protocol === 'openai'
+        const thinkingParam = provider.capabilities.thinking
+          ? explicitThinking || initial.thinking
+            ? { thinking: { type: initial.thinking ? ('enabled' as const) : ('disabled' as const) } }
+            : {}
+          : {}
         const body: CreateMessageRequest = {
           model,
           ...(trimmedSystem.trim() ? { system: trimmedSystem } : {}),
@@ -1582,13 +1590,7 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
               }
             : {
                 max_tokens: MAX_OUTPUT_TOKENS,
-                // DeepSeek 的思考模式默认开启，关闭时必须显式传 disabled；
-                // 其它服务商默认关闭，只在开启时传，避免不认识该字段的接口报错。
-                ...(provider.id === 'deepseek'
-                  ? { thinking: { type: initial.thinking ? ('enabled' as const) : ('disabled' as const) } }
-                  : provider.capabilities.thinking && initial.thinking
-                    ? { thinking: { type: 'enabled' as const } }
-                    : {}),
+                ...thinkingParam,
               }),
           ...(wantsServerTitle ? { title: { enabled: true } } : {}),
         }

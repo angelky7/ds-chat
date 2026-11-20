@@ -18,6 +18,11 @@ export type ChatCompletionRequest = {
   messages: OpenAIMessage[]
   max_tokens?: number
   temperature?: number
+  /**
+   * OpenRouter 的推理开关：开启用 enabled，关闭必须用 effort: 'none'
+   * （enabled: false 在该接口上没有明确定义）。
+   */
+  reasoning?: { enabled: true } | { effort: 'none' }
 }
 
 /** Anthropic 内容块 → OpenAI 文本片段；图片按 data URL 内联，其余块丢弃 */
@@ -80,6 +85,10 @@ export const toChatCompletion = (
     messages,
     ...(body.max_tokens ? { max_tokens: body.max_tokens } : {}),
     ...(body.temperature !== undefined ? { temperature: body.temperature } : {}),
+    // 思考开关：Anthropic 的 thinking 在 OpenAI 兼容接口里对应 reasoning
+    ...(body.thinking
+      ? { reasoning: body.thinking.type === 'enabled' ? { enabled: true as const } : { effort: 'none' as const } }
+      : {}),
   }
 }
 
@@ -232,7 +241,19 @@ export async function* streamChatCompletion(
       yield start()
     }
     const deltaPayload = (choice.delta ?? {}) as Record<string, unknown>
-    const reasoning = chunkText(deltaPayload.reasoning_content) || chunkText(deltaPayload.reasoning)
+    const reasoning =
+      chunkText(deltaPayload.reasoning_content) ||
+      chunkText(deltaPayload.reasoning) ||
+      // OpenRouter 也可能只给结构化数组：取其中的 reasoning.text 片段
+      (Array.isArray(deltaPayload.reasoning_details)
+        ? deltaPayload.reasoning_details
+            .map((item) =>
+              item && typeof item === 'object' && (item as { type?: string }).type === 'reasoning.text'
+                ? chunkText((item as { text?: unknown }).text)
+                : ''
+            )
+            .join('')
+        : '')
     if (reasoning) {
       if (openKind !== 'thinking') {
         const closed = closeBlock()
