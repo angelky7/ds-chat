@@ -406,14 +406,22 @@ export const loadMessageDraft = async (
       }),
       isImage: file.isImage,
       previewUrl: file.isImage ? URL.createObjectURL(blob) : null,
+      ...(file.local ? { local: true } : {}),
       ...(file.text ? { text: file.text } : {}),
     }
     attachments.push(attachment)
+    // 只有本地文字的文档、或已标成本地的附件：原件还在，直接按本地内容重发，
+    // 不必也不该再走一次上传（旧版本留下的消息没有 local 标记，用「有文字」兜底判断）
+    const localOnly = file.local || (!file.isImage && Boolean(attachment.text?.trim()))
     const serverId = file.serverId
     if (serverId) {
       useUploads.setState((state) => ({
         tasks: { ...state.tasks, [file.id]: { status: 'done', serverId } },
       }))
+    } else if (localOnly) {
+      if (!file.isImage && !attachment.text?.trim()) {
+        extract(sessionId, attachment)
+      }
     } else if (!inline) {
       // 当前服务商走 Files API 但这条附件没有 file_id：按新附件重新上传
       upload(sessionId, attachment, apiKey)
