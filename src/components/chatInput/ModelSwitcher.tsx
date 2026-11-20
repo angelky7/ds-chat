@@ -16,6 +16,17 @@ import { openSettings } from '../settings/settingsDialogState.js'
 import styles from './ModelSwitcher.module.css'
 
 /**
+ * 按钮宽度有限，带供应商前缀的模型名（`nvidia/nemotron-3.5-super-vl:free`）
+ * 一截就被省略号吃掉。这里去掉斜杠及其前面的部分，只留模型名本身；
+ * 菜单里仍展示完整名称，避免同名模型认错。
+ */
+const shortModelName = (model: string): string => {
+  const index = model.lastIndexOf('/')
+  const tail = index >= 0 ? model.slice(index + 1) : model
+  return tail || model
+}
+
+/**
  * 输入框右下角的模型选择器：列出所有已挂载服务商的模型，
  * 一个 Key 下的多个模型平铺展示，选中项带勾；末尾进入模型服务管理。
  */
@@ -60,7 +71,7 @@ export const ModelSwitcher = () => {
           title={`${provider.preset.label} · ${provider.model}`}
           onClick={toggle}
         >
-          <span className={styles.name}>{provider.model}</span>
+          <span className={styles.name}>{shortModelName(provider.model)}</span>
           <IconChevronDownOutline14 />
         </button>
       )}
