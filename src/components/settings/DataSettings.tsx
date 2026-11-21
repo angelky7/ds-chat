@@ -109,6 +109,25 @@ const useHistoryDelete = (onBusyChange?: (busy: boolean) => void) => {
   }
 }
 
+/**
+ * 备份包固定是 ZIP。这里显式列出类型而不是留空：
+ * 部分安卓浏览器的选择器在 accept 为空时只给相机/相册入口，选不到下载目录里的备份。
+ */
+const IMPORT_ACCEPT = '.zip,application/zip,application/x-zip-compressed,application/octet-stream'
+
+/** 触屏设备上补一句备用路径：安卓内核的选择器行为不受我们控制。 */
+const useCoarsePointer = () => {
+  const [coarse, setCoarse] = useState(false)
+  useEffect(() => {
+    const query = window.matchMedia('(pointer: coarse)')
+    setCoarse(query.matches)
+    const onChange = (event: MediaQueryListEvent) => setCoarse(event.matches)
+    query.addEventListener('change', onChange)
+    return () => query.removeEventListener('change', onChange)
+  }, [])
+  return coarse
+}
+
 /** 导入 = 覆盖：用选中文件替换本地全部会话与附件。 */
 const ImportHistory = ({
   historyImport,
@@ -118,33 +137,42 @@ const ImportHistory = ({
   disabled: boolean
 }) => {
   const t = useTranslate()
-  const inputRef = useRef<HTMLInputElement>(null)
+  const coarse = useCoarsePointer()
 
   return (
     <SettingCell
       label={t('historyImport')}
-      description={t('historyImportDescription')}
+      description={
+        coarse
+          ? `${t('historyImportDescription')}${t('historyImportMobileHint')}`
+          : t('historyImportDescription')
+      }
       status={historyImport.status}
       action={
-        <>
+        <span className={styles.importButton}>
           <Button
             variant="outlined"
             size="m"
-            className={clsx(styles.cellButton, styles.uploadButton)}
+            className={clsx(styles.cellButton, styles.uploadButton, styles.importButtonFace)}
             disabled={disabled}
             aria-busy={disabled || undefined}
-            title={disabled ? t('historyImporting') : undefined}
-            onClick={() => inputRef.current?.click()}
+            aria-hidden
+            tabIndex={-1}
           >
             <IconUploadOutline14 />
             {disabled ? t('historyImporting') : t('upload')}
           </Button>
+          {/*
+            接住点击的是盖在按钮上的原生 input：手指直接触发选择器，不走 programmatic click ——
+            部分安卓浏览器会把脚本触发的 hidden input 降级成只能拍照/选相册。
+            同时显式写 accept：accept 为空时个别内核（如 ColorOS 浏览器）同样只给媒体入口。
+            文件类型仍由 checkArchiveFormat 校验，不依赖选择器的过滤。
+          */}
           <input
-            ref={inputRef}
             type="file"
-            // 不写 accept：部分浏览器/安卓文件选择器会把 .zip 归到 octet-stream，
-            // 按扩展名过滤反而让备份文件变灰不可选。格式由 checkArchiveFormat 校验。
-            // 也不使用 hidden：部分移动浏览器会禁用隐藏 input 的 programmatically click。
+            accept={IMPORT_ACCEPT}
+            aria-label={disabled ? t('historyImporting') : t('upload')}
+            disabled={disabled}
             className={styles.fileInput}
             onChange={(event) => {
               const file = event.target.files?.[0]
@@ -154,7 +182,7 @@ const ImportHistory = ({
               }
             }}
           />
-        </>
+        </span>
       }
     />
   )

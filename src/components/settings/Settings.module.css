@@ -457,14 +457,27 @@
   background-color: var(--dsw-alias-bg-layer-3);
 }
 /* 隐藏但保留可交互性：部分移动浏览器会忽略 hidden / display:none 的 file input */
+.importButton {
+  position: relative;
+  display: inline-flex;
+}
+
+/* 视觉按钮只是外皮：点击要落到盖在上面的原生 input 上 */
+.importButtonFace {
+  pointer-events: none;
+}
+
+/* 原生文件输入铺满按钮区（透明但可点）。
+   不用 1px + pointer-events:none：部分安卓浏览器会把这种 input 的点击降级成相机/相册入口。 */
 .fileInput {
   position: absolute;
-  width: 1px;
-  height: 1px;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   padding: 0;
   border: 0;
   opacity: 0;
-  pointer-events: none;
+  cursor: pointer;
 }
 
 /* 版本号只读展示：弱化的次要文字 */

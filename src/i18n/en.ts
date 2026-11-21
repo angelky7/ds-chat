@@ -370,6 +370,8 @@ export const en = {
     'The uploaded chat history will replace all your current chats. Import anyway?',
   historyImportDescription:
     'Importing chat history replaces all local chats and attachments. Supports ZIP files exported from DeepSeek.',
+  historyImportMobileHint:
+    ' If your phone only offers the camera or gallery, open this page in Chrome or Edge to import.',
   historyImportedOne: 'Imported 1 chat',
   historyImported: 'Imported {count} chats',
   historyImportFailed:
